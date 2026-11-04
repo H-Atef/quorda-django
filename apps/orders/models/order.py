@@ -83,8 +83,10 @@ class OrderItem(models.Model):
     )
     menu_item = models.ForeignKey(
         'restaurants.MenuItem',
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name='order_items',
+        null=True,
+        blank=True
     )
     quantity = models.PositiveIntegerField()
 
