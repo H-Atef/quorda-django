@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -13,6 +14,7 @@ from apps.orders.serializers import (
 )
 from apps.orders.permissions import IsRestaurantOwner, IsOrderItemOwner, IsOrderCustomer
 from apps.orders.services import OrderService, CustomerOrderService
+from apps.orders.models import Order
 
 
 WINDOW_SIZE_PARAM = OpenApiParameter(
@@ -22,6 +24,14 @@ WINDOW_SIZE_PARAM = OpenApiParameter(
     required=False,
     default=10,
     description='Number of orders per chronological window.',
+)
+
+STATUS_PARAM = OpenApiParameter(
+    name='status',
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description='Comma-separated order statuses to include (default: pending,preparing).',
 )
 
 
@@ -90,12 +100,12 @@ class OrderDetailAPIView(APIView):
 
 @extend_schema(tags=['Orders'])
 class VIPOrdersAPIView(APIView):
-    """GET: VIP-only orders (special_flag=True), sorted by id."""
+    """GET: VIP-only orders (special_flag=True), sorted by created_at (oldest first)."""
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
         summary='List VIP orders',
-        description='Returns only orders with special_flag=True, sorted by id ascending.',
+        description='Returns only orders with special_flag=True, sorted by created_at ascending (oldest first).',
         responses=OrderSerializer(many=True),
     )
     def get(self, request):
@@ -103,22 +113,29 @@ class VIPOrdersAPIView(APIView):
         return Response(OrderSerializer(vip, many=True).data)
 
 
-
-
 @extend_schema(tags=['Orders'])
 class WindowedOrdersAPIView(APIView):
-    """GET: orders grouped into chronological windows, VIP-first + priority sorted within each."""
+    """GET: orders grouped into chronological windows. Preparing orders stay on
+    top (oldest first), followed by windowed pending orders."""
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
         summary='List orders windowed (all orders)',
-        description='Chronological windows of size window_size; VIP orders rank first within each window, normals sorted by priority_score desc.',
-        parameters=[WINDOW_SIZE_PARAM],
+        description=(
+            'Default: pending and preparing orders only (filter before windowing). '
+            'Preparing orders rank before pending orders and are not reordered below them. '
+            'Use ?status= to include other statuses. VIP orders rank first within '
+            'their pending window; normals are sorted by priority_score desc.'
+        ),
+        parameters=[WINDOW_SIZE_PARAM, STATUS_PARAM],
         responses=OrderSerializer(many=True),
     )
     def get(self, request):
         window_size = _parse_window_size(request)
-        sorted_orders = OrderService.get_windowed_orders(request.user.restaurant_profile, window_size)
+        statuses = _parse_statuses(request)
+        sorted_orders = OrderService.get_windowed_orders(
+            request.user.restaurant_profile, window_size, statuses=statuses
+        )
         return Response(OrderSerializer(sorted_orders, many=True).data)
 
 
@@ -139,18 +156,26 @@ class OrdersByCreationTimeAPIView(APIView):
 
 @extend_schema(tags=['Orders'])
 class NormalOrdersWindowedAPIView(APIView):
-    """GET: non-VIP orders only, grouped into chronological windows and sorted by priority_score desc."""
+    """GET: non-VIP orders only. Preparing orders stay on top (oldest first),
+    followed by windowed pending orders."""
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
         summary='List normal (non-VIP) orders windowed',
-        description='Same windowing as /orders/windowed/ but excludes VIP orders entirely.',
-        parameters=[WINDOW_SIZE_PARAM],
+        description=(
+            'Default: pending and preparing normal orders only (filter before windowing). '
+            'Preparing orders rank before pending orders and are not reordered below them. '
+            'Use ?status= to include other statuses.'
+        ),
+        parameters=[WINDOW_SIZE_PARAM, STATUS_PARAM],
         responses=OrderSerializer(many=True),
     )
     def get(self, request):
         window_size = _parse_window_size(request)
-        sorted_orders = OrderService.get_normal_windowed_orders(request.user.restaurant_profile, window_size)
+        statuses = _parse_statuses(request)
+        sorted_orders = OrderService.get_normal_windowed_orders(
+            request.user.restaurant_profile, window_size, statuses=statuses
+        )
         return Response(OrderSerializer(sorted_orders, many=True).data)
 
 
@@ -184,9 +209,8 @@ class SimpleOrdersAPIView(APIView):
 
 @extend_schema(tags=['Order Items'])
 class OrderItemListCreateAPIView(APIView):
-    """Items of one order. Creating/deleting items triggers the OrderItem
-    post_save/post_delete signal, which recalculates the parent order's
-    priority_score automatically — no manual recalc needed here."""
+    """Items of one order. Item mutations recalculate the parent order's
+    priority_score."""
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(summary='List items of an order', responses=OrderItemReadSerializer(many=True))
@@ -327,9 +351,21 @@ def _parse_window_size(request):
     try:
         window_size = int(raw)
     except (TypeError, ValueError):
-        from rest_framework.exceptions import ValidationError
         raise ValidationError({'window_size': 'Must be an integer.'})
     if window_size < 1:
-        from rest_framework.exceptions import ValidationError
         raise ValidationError({'window_size': 'Must be at least 1.'})
     return window_size
+
+
+def _parse_statuses(request):
+    raw = request.query_params.get('status')
+    if raw is None:
+        return None
+    valid = set(Order.Status.values)
+    statuses = [s.strip() for s in raw.split(',') if s.strip()]
+    if not statuses:
+        raise ValidationError({'status': 'Must include at least one status.'})
+    invalid = [s for s in statuses if s not in valid]
+    if invalid:
+        raise ValidationError({'status': f'Invalid status value(s): {", ".join(invalid)}. Valid: {", ".join(sorted(valid))}.'})
+    return statuses

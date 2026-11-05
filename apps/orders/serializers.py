@@ -52,6 +52,13 @@ class OrderWriteSerializer(serializers.ModelSerializer):
         fields = ['id', 'customer', 'is_indoor', 'status', 'special_flag', 'order_items']
         read_only_fields = ['id']
 
+    def validate_order_items(self, value):
+        if self.partial and value is None:
+            return value
+        if not value:
+            raise serializers.ValidationError('An order must contain at least one item.')
+        return value
+
     def validate(self, attrs):
         if not attrs.get('is_indoor', True) and not attrs.get('customer'):
             raise serializers.ValidationError('customer is required for delivery orders.')

@@ -67,20 +67,28 @@ class CriteriaSerializer(serializers.ModelSerializer):
 
 
 class CalculationParamsSerializer(serializers.ModelSerializer):
-    time_weight = serializers.FloatField(validators=[sh.validate_positive])
-    quantity_weight = serializers.FloatField(validators=[sh.validate_positive])
-    category_weight = serializers.FloatField(validators=[sh.validate_positive])
+    time_weight = serializers.FloatField(min_value=0.0)
+    quantity_weight = serializers.FloatField(min_value=0.0)
+    category_weight = serializers.FloatField(min_value=0.0)
+
     class Meta:
         model = RestaurantCalculationParams
         fields = ('id', 'restaurant', 'time_weight', 'quantity_weight', 'category_weight', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at','restaurant')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'restaurant')
 
     def validate(self, data):
-        
-         # Only check sum when all three are provided (full update or create)
         if all(k in data for k in ('time_weight', 'quantity_weight', 'category_weight')):
             total = data['time_weight'] + data['quantity_weight'] + data['category_weight']
             if abs(total - 1.0) > 0.0001:
                 raise serializers.ValidationError("Weights must sum to 1.")
-        
+        else:
+            instance = getattr(self, 'instance', None)
+            if instance is not None and any(k in data for k in ('time_weight', 'quantity_weight', 'category_weight')):
+                total = (
+                    data.get('time_weight', instance.time_weight)
+                    + data.get('quantity_weight', instance.quantity_weight)
+                    + data.get('category_weight', instance.category_weight)
+                )
+                if abs(total - 1.0) > 0.0001:
+                    raise serializers.ValidationError("Weights must sum to 1.")
         return data

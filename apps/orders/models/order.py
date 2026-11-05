@@ -35,9 +35,8 @@ class Order(models.Model):
     )
     special_flag = models.BooleanField(
         default=False,
-        help_text='VIP order — sorted by ID before normal orders.',
+        help_text='VIP order — ranked before normal orders (oldest first among VIPs).',
     )
-
 
     priority_score = models.FloatField(default=0.0, editable=False)
 
@@ -55,19 +54,22 @@ class Order(models.Model):
 
     @property
     def total_prep_time(self) -> int:
-        return sum(item.menu_item.prep_time * item.quantity for item in self.order_items.all())
+        return sum(
+            (item.menu_item.prep_time * item.quantity) if item.menu_item else 0
+            for item in self.order_items.all()
+        )
 
     @property
     def total_cost(self) -> float:
-        return sum(float(item.menu_item.price) * item.quantity for item in self.order_items.all())
+        return sum(
+            (float(item.menu_item.price) * item.quantity) if item.menu_item else 0.0
+            for item in self.order_items.all()
+        )
 
-    def recalculate_priority_score(self) -> None:
-        """Recompute and persist priority_score. This is a regular method
-        (not a property) so it can't collide with the model field and its
-        call-site (`order.recalculate_priority_score()`) actually does
-        what it looks like it does."""
+    def recalculate_priority_score(self, items=None) -> None:
+        """Recompute and persist priority_score."""
         from apps.orders.helpers.priority_calculator import PriorityCalculator
-        self.priority_score = PriorityCalculator.compute_score(self)
+        self.priority_score = PriorityCalculator.compute_score(self, items=items)
         self.save(update_fields=['priority_score', 'updated_at'])
 
     def __str__(self):
@@ -96,11 +98,12 @@ class OrderItem(models.Model):
 
     @property
     def total_prep_time(self):
-        return self.menu_item.prep_time * self.quantity
+        return (self.menu_item.prep_time * self.quantity) if self.menu_item else 0
 
     @property
     def total_price(self):
-        return float(self.menu_item.price) * self.quantity
+        return (float(self.menu_item.price) * self.quantity) if self.menu_item else 0.0
 
     def __str__(self):
-        return f"{self.quantity}x {self.menu_item.name} (Order #{self.order_id})"
+        name = self.menu_item.name if self.menu_item else 'deleted item'
+        return f"{self.quantity}x {name} (Order #{self.order_id})"

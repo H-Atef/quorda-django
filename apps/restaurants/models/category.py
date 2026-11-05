@@ -18,7 +18,7 @@ class Category(models.Model):
     priority = models.IntegerField(
         default=1,
         validators=[MinValueValidator(1), MaxValueValidator(5)],
-        help_text='Priority 1 (lowest) to 5 (highest)',
+        help_text='Priority 1 (normal) to 5 (serve sooner).',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

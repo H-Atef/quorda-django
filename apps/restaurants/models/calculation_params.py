@@ -14,18 +14,18 @@ class RestaurantCalculationParams(models.Model):
     )
     time_weight = models.FloatField(
         default=0.4,
-        validators=[MinValueValidator(0.0001)],
+        validators=[MinValueValidator(0.0)],
         help_text='Weight for time inverse score (e.g. 0.4)',
     )
     quantity_weight = models.FloatField(
         default=0.4,
-        validators=[MinValueValidator(0.0001)],
+        validators=[MinValueValidator(0.0)],
         help_text='Weight for quantity inverse score (e.g. 0.4)',
     )
     category_weight = models.FloatField(
         default=0.2,
-        validators=[MinValueValidator(0.0001)],
-        help_text='Weight for category priority boost score (e.g. 0.2)',
+        validators=[MinValueValidator(0.0)],
+        help_text='Weight for category priority score (e.g. 0.2)',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

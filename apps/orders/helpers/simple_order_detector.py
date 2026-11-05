@@ -18,7 +18,7 @@ class SimpleOrderDetector:
         """
         simple = []
         for order in orders:
-            items = list(order.order_items.select_related('menu_item__category').all())
+            items = list(order.order_items.all())
             total_qty = sum(i.quantity for i in items)
             if total_qty > criteria.max_quantity:
                 continue
@@ -26,7 +26,7 @@ class SimpleOrderDetector:
                 (
                     i.menu_item.category.priority
                     for i in items
-                    if getattr(i.menu_item, 'category', None) is not None
+                    if i.menu_item is not None and i.menu_item.category is not None
                 ),
                 default=0,
             )

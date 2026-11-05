@@ -7,6 +7,9 @@ from apps.orders.helpers.order_sorter import OrderSorter
 from apps.orders.helpers.simple_order_detector import SimpleOrderDetector
 from apps.restaurants.services import CriteriaService
 
+ACTIVE_ORDER_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+
+
 class OrderService:
     """Business logic for restaurant-owner order operations (dine-in +
     management of all orders belonging to the restaurant)."""
@@ -73,24 +76,29 @@ class OrderService:
         order.delete()
 
     # ---- order item CRUD --------------------------------------------------
-    # Creating/deleting items triggers the OrderItem post_save/post_delete
-    # signal, which recalculates the parent order's priority_score
-    # automatically — no manual recalc needed here.
+    # Item CRUD via services/views must explicitly recalculate because the
+    # service layer mutates items directly and bulk operations do not run
+    # model-level hooks.
 
     @staticmethod
     def add_item(order, validated_data):
-        return OrderItem.objects.create(order=order, **validated_data)
+        item = OrderItem.objects.create(order=order, **validated_data)
+        order.recalculate_priority_score()
+        return item
 
     @staticmethod
     def update_item(item, validated_data):
         for attr, value in validated_data.items():
             setattr(item, attr, value)
         item.save()
+        item.order.recalculate_priority_score()
         return item
 
     @staticmethod
     def delete_item(item):
+        order = item.order
         item.delete()
+        order.recalculate_priority_score()
 
     # ---- listing / analytics helpers --------------------------------------
 
@@ -100,14 +108,32 @@ class OrderService:
         return OrderSorter.get_vip_orders(orders)
 
     @staticmethod
-    def get_windowed_orders(restaurant, window_size):
+    def get_windowed_orders(restaurant, window_size, statuses=None):
         orders = OrderService.get_restaurant_orders_qs(restaurant)
-        return OrderSorter.sort_with_window(orders, window_size=window_size)
+        if statuses is None:
+            statuses = ACTIVE_ORDER_STATUSES
+        orders = list(orders.filter(status__in=statuses))
+        preparing = [o for o in orders if o.status == Order.Status.PREPARING]
+        pending = [o for o in orders if o.status == Order.Status.PENDING]
+        others = [o for o in orders if o.status not in (Order.Status.PREPARING, Order.Status.PENDING)]
+        preparing = sorted(preparing, key=lambda o: o.created_at)
+        pending_windowed = OrderSorter.sort_with_window(pending, window_size=window_size)
+        others_sorted = OrderSorter.sort_with_window(others, window_size=window_size)
+        return preparing + pending_windowed + others_sorted
 
     @staticmethod
-    def get_normal_windowed_orders(restaurant, window_size):
+    def get_normal_windowed_orders(restaurant, window_size, statuses=None):
         orders = OrderService.get_restaurant_orders_qs(restaurant)
-        return OrderSorter.sort_normal_with_window(orders, window_size=window_size)
+        if statuses is None:
+            statuses = ACTIVE_ORDER_STATUSES
+        orders = list(orders.filter(status__in=statuses))
+        preparing = [o for o in orders if o.status == Order.Status.PREPARING and not o.special_flag]
+        pending = [o for o in orders if o.status == Order.Status.PENDING and not o.special_flag]
+        others = [o for o in orders if o.status not in (Order.Status.PREPARING, Order.Status.PENDING) and not o.special_flag]
+        preparing = sorted(preparing, key=lambda o: o.created_at)
+        pending_windowed = OrderSorter.sort_normal_with_window(pending, window_size=window_size)
+        others_sorted = OrderSorter.sort_normal_with_window(others, window_size=window_size)
+        return preparing + pending_windowed + others_sorted
 
     @staticmethod
     def get_simple_orders(restaurant):
