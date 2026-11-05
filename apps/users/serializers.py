@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.users.models import User, RestaurantProfile
+from apps.users.models import User, RestaurantProfile, CashierProfile
 from apps.users.services.auth_service import AuthService
 from apps.users.helpers.constants import UserRole
 
@@ -12,6 +12,15 @@ class RestaurantProfileSerializer(serializers.ModelSerializer):
             'logo_url', 'is_active', 'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class CashierProfileSerializer(serializers.ModelSerializer):
+    restaurant_name = serializers.CharField(source='restaurant.restaurant_name', read_only=True)
+
+    class Meta:
+        model = CashierProfile
+        fields = ('id', 'restaurant', 'restaurant_name', 'is_active', 'can_set_vip', 'created_at')
+        read_only_fields = ('id', 'restaurant', 'restaurant_name', 'is_active', 'can_set_vip', 'created_at')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -69,14 +78,41 @@ class LoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     restaurant_profile = RestaurantProfileSerializer(read_only=True)
+    cashier_profile = CashierProfileSerializer(read_only=True)
 
     class Meta:
         model = User
         fields = (
             'id', 'username', 'email', 'role', 'phone_number',
-            'restaurant_profile', 'created_at', 'updated_at',
+            'restaurant_profile', 'cashier_profile', 'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at', 'role')
+
+
+class CashierUserSerializer(serializers.ModelSerializer):
+    cashier_profile = CashierProfileSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'role', 'phone_number', 'cashier_profile', 'created_at')
+        read_only_fields = fields
+
+
+class CashierCreateSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    phone_number = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=20)
+    can_set_vip = serializers.BooleanField(required=False, default=False)
+
+
+class CashierUpdateSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField(required=False)
+    can_set_vip = serializers.BooleanField(required=False)
+
+
+class SetVipPermissionSerializer(serializers.Serializer):
+    can_set_vip = serializers.BooleanField()
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

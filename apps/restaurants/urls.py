@@ -4,7 +4,8 @@ from apps.restaurants.views import (
     CategoryListCreateView, CategoryDetailView,
     MenuItemListCreateView, MenuItemDetailView,
     CriteriaView,
-    CalculationParamsView
+    CalculationParamsView,
+    ShiftDefinitionListCreateView, ShiftDefinitionDetailView,
 )
 
 urlpatterns = [
@@ -26,5 +27,8 @@ urlpatterns = [
 
     # Calculation params (owner only)
     path('api/v1/restaurants/calculation-params/', CalculationParamsView.as_view(), name='calculation-params'),
-    
-    ]
+
+    # Shifts (owner only)
+    path('shifts/', ShiftDefinitionListCreateView.as_view(), name='restaurant-shift-list-create'),
+    path('shifts/<uuid:pk>/', ShiftDefinitionDetailView.as_view(), name='restaurant-shift-detail'),
+]

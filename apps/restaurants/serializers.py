@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from apps.restaurants.models import Category, MenuItem, Criteria, RestaurantCalculationParams
+
+from apps.restaurants.models import Category, MenuItem, Criteria, RestaurantCalculationParams, ShiftDefinition
+from apps.users.helpers.restaurant import get_user_restaurant
 from apps.users.models import RestaurantProfile
-from apps.restaurants.helpers.validators import ServiceErrorHandler as sh
 
 
 
@@ -40,11 +41,11 @@ class MenuItemSerializer(serializers.ModelSerializer):
         if category is None:
             return None
         request = self.context.get('request')
-        if request and hasattr(request.user, 'restaurant_profile'):
-            if category.restaurant_id != request.user.restaurant_profile.id:
-                raise serializers.ValidationError(
-                    'This category does not belong to your restaurant.'
-                )
+        restaurant = get_user_restaurant(getattr(request, 'user', None))
+        if restaurant and category.restaurant_id != restaurant.id:
+            raise serializers.ValidationError(
+                'This category does not belong to your restaurant.'
+            )
         return category
 
     def validate(self, data):
@@ -92,3 +93,10 @@ class CalculationParamsSerializer(serializers.ModelSerializer):
                 if abs(total - 1.0) > 0.0001:
                     raise serializers.ValidationError("Weights must sum to 1.")
         return data
+
+
+class ShiftDefinitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShiftDefinition
+        fields = ('id', 'restaurant', 'name', 'time_range', 'is_active', 'created_at')
+        read_only_fields = ('id', 'restaurant', 'created_at')

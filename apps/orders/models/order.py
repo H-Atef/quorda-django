@@ -24,6 +24,14 @@ class Order(models.Model):
         related_name='orders',
         help_text='Required when is_indoor=False (delivery). Optional for dine-in.',
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name='created_orders',
+    )
     is_indoor = models.BooleanField(
         default=True,
         help_text='True = dine-in (no customer required). False = delivery (customer required).',
@@ -36,6 +44,14 @@ class Order(models.Model):
     special_flag = models.BooleanField(
         default=False,
         help_text='VIP order — ranked before normal orders (oldest first among VIPs).',
+    )
+    shift = models.ForeignKey(
+        'restaurants.ShiftDefinition',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name='orders',
     )
 
     priority_score = models.FloatField(default=0.0, editable=False)
@@ -61,10 +77,13 @@ class Order(models.Model):
 
     @property
     def total_cost(self) -> float:
-        return sum(
-            (float(item.menu_item.price) * item.quantity) if item.menu_item else 0.0
-            for item in self.order_items.all()
-        )
+        total = 0.0
+        for item in self.order_items.all():
+            if item.unit_price is not None:
+                total += float(item.unit_price) * item.quantity
+            elif item.menu_item:
+                total += float(item.menu_item.price) * item.quantity
+        return total
 
     def recalculate_priority_score(self, items=None) -> None:
         """Recompute and persist priority_score."""
@@ -91,6 +110,7 @@ class OrderItem(models.Model):
         blank=True
     )
     quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=8, decimal_places=2, null=True)
 
     class Meta:
         verbose_name = 'Order Item'
@@ -102,6 +122,8 @@ class OrderItem(models.Model):
 
     @property
     def total_price(self):
+        if self.unit_price is not None:
+            return float(self.unit_price) * self.quantity
         return (float(self.menu_item.price) * self.quantity) if self.menu_item else 0.0
 
     def __str__(self):

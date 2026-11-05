@@ -1,4 +1,4 @@
-from apps.restaurants.models import Category, MenuItem, Criteria, RestaurantCalculationParams
+from apps.restaurants.models import Category, MenuItem, Criteria, RestaurantCalculationParams, ShiftDefinition
 from apps.users.models.restaurant_profile import RestaurantProfile
 from apps.restaurants.helpers.validators import ServiceErrorHandler
 import uuid
@@ -149,3 +149,45 @@ class PublicRestaurantsService:
     def list_menu_items(restaurant_id):
         restaurant = PublicRestaurantsService.get_active_restaurant(restaurant_id)
         return MenuItemService.list_for_restaurant(restaurant)
+
+
+class ShiftDefinitionService:
+    _UNIQUE_CONSTRAINTS = {
+        'unique_shift_restaurant_name': {'name': 'A shift with this name already exists.'}
+    }
+
+    @staticmethod
+    @ServiceErrorHandler.handle_all_exceptions()
+    def list_for_restaurant(restaurant_profile):
+        return ShiftDefinition.objects.filter(restaurant=restaurant_profile)
+
+    @staticmethod
+    @ServiceErrorHandler.handle_all_exceptions()
+    @ServiceErrorHandler.handle_does_not_exist(model_name='Shift')
+    def get_by_id(shift_id, restaurant_profile):
+        return ShiftDefinition.objects.get(pk=shift_id, restaurant=restaurant_profile)
+
+    @staticmethod
+    @ServiceErrorHandler.handle_all_exceptions()
+    @ServiceErrorHandler.handle_integrity_error(_UNIQUE_CONSTRAINTS)
+    def create(restaurant_profile, validated_data):
+        shift = ShiftDefinition(restaurant=restaurant_profile, **validated_data)
+        shift.full_clean()
+        shift.save()
+        return shift
+
+    @staticmethod
+    @ServiceErrorHandler.handle_all_exceptions()
+    @ServiceErrorHandler.handle_integrity_error(_UNIQUE_CONSTRAINTS)
+    def update(shift, validated_data, partial=False):
+        for attr, value in validated_data.items():
+            setattr(shift, attr, value)
+        shift.full_clean()
+        shift.save()
+        return shift
+
+    @staticmethod
+    @ServiceErrorHandler.handle_all_exceptions()
+    def deactivate(shift):
+        shift.is_active = False
+        shift.save(update_fields=['is_active'])

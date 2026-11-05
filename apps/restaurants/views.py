@@ -3,17 +3,18 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import NotFound
 
-from apps.restaurants.permissions import IsRestaurantOwner
+from apps.restaurants.permissions import IsRestaurantOwner, IsRestaurantOwnerOnly
 from apps.restaurants.serializers import (
     CategorySerializer, MenuItemSerializer, CriteriaSerializer, CalculationParamsSerializer,
-    PublicRestaurantProfileSerializer,
+    PublicRestaurantProfileSerializer, ShiftDefinitionSerializer,
 )
 from apps.restaurants.services import (
-    CategoryService, MenuItemService, CriteriaService, CalculationParamsService,PublicRestaurantsService
+    CategoryService, MenuItemService, CriteriaService, CalculationParamsService,
+    PublicRestaurantsService, ShiftDefinitionService,
 )
+from apps.users.helpers.restaurant import get_user_restaurant
 
 
 
@@ -73,8 +74,11 @@ class RestaurantMenuItemsView(APIView):
 
 @extend_schema(tags=['restaurant-categories'])
 class CategoryListCreateView(APIView):
-    
-    permission_classes = [IsRestaurantOwner]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsRestaurantOwner()]
+        return [IsRestaurantOwnerOnly()]
 
     @extend_schema(
         tags=['restaurant-categories'],
@@ -84,7 +88,7 @@ class CategoryListCreateView(APIView):
         responses={200: OpenApiResponse(response=CategorySerializer(many=True))},
     )
     def get(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         categories = CategoryService.list_for_restaurant(profile)
         return Response(CategorySerializer(categories, many=True).data)
 
@@ -99,7 +103,7 @@ class CategoryListCreateView(APIView):
         },
     )
     def post(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         serializer = CategorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         category = CategoryService.create(profile, serializer.validated_data)
@@ -108,11 +112,14 @@ class CategoryListCreateView(APIView):
 
 @extend_schema(tags=['restaurant-categories'])
 class CategoryDetailView(APIView):
-    
-    permission_classes = [IsRestaurantOwner]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsRestaurantOwner()]
+        return [IsRestaurantOwnerOnly()]
 
     def _get_category(self, request, pk):
-        return CategoryService.get_by_id(pk, request.user.restaurant_profile)
+        return CategoryService.get_by_id(pk, get_user_restaurant(request.user))
 
     @extend_schema(
         tags=['restaurant-categories'],
@@ -166,8 +173,11 @@ class CategoryDetailView(APIView):
 
 @extend_schema(tags=['restaurant-menu-items'])
 class MenuItemListCreateView(APIView):
-    
-    permission_classes = [IsRestaurantOwner]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsRestaurantOwner()]
+        return [IsRestaurantOwnerOnly()]
 
     @extend_schema(
         tags=['restaurant-menu-items'],
@@ -177,7 +187,7 @@ class MenuItemListCreateView(APIView):
         responses={200: OpenApiResponse(response=MenuItemSerializer(many=True))},
     )
     def get(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         items = MenuItemService.list_for_restaurant(profile)
         return Response(MenuItemSerializer(items, many=True).data)
 
@@ -192,7 +202,7 @@ class MenuItemListCreateView(APIView):
         },
     )
     def post(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         serializer = MenuItemSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         item = MenuItemService.create(profile, serializer.validated_data)
@@ -201,11 +211,14 @@ class MenuItemListCreateView(APIView):
 
 @extend_schema(tags=['restaurant-menu-items'])
 class MenuItemDetailView(APIView):
-    
-    permission_classes = [IsRestaurantOwner]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsRestaurantOwner()]
+        return [IsRestaurantOwnerOnly()]
 
     def _get_item(self, request, pk):
-        return MenuItemService.get_by_id(pk, request.user.restaurant_profile)
+        return MenuItemService.get_by_id(pk, get_user_restaurant(request.user))
 
     @extend_schema(
         tags=['restaurant-menu-items'],
@@ -259,8 +272,8 @@ class MenuItemDetailView(APIView):
 
 @extend_schema(tags=['restaurant-criteria'])
 class CriteriaView(APIView):
-    
-    permission_classes = [IsRestaurantOwner]
+
+    permission_classes = [IsRestaurantOwnerOnly]
 
     @extend_schema(
         tags=['restaurant-criteria'],
@@ -272,7 +285,7 @@ class CriteriaView(APIView):
         },
     )
     def get(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         criteria = CriteriaService.get_or_none(profile)
         if criteria is None:
             return Response(
@@ -293,13 +306,13 @@ class CriteriaView(APIView):
         },
     )
     def post(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         serializer = CriteriaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         criteria, created = CriteriaService.create_or_update(profile, serializer.validated_data)
         http_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(CriteriaSerializer(criteria).data, status=http_status)
-    
+
     @extend_schema(
         tags=['restaurant-criteria'],
         operation_id='v1_restaurants_criteria_delete',
@@ -310,7 +323,7 @@ class CriteriaView(APIView):
         },
     )
     def delete(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         criteria = CriteriaService.get_or_none(profile)
         if criteria is None:
             raise NotFound('No criteria configured for this restaurant.')
@@ -324,7 +337,7 @@ class CriteriaView(APIView):
 
 @extend_schema(tags=['restaurant-calculation-params'])
 class CalculationParamsView(APIView):
-    permission_classes = [IsRestaurantOwner]
+    permission_classes = [IsRestaurantOwnerOnly]
 
     @extend_schema(
         operation_id='v1_restaurants_calculation_params_get',
@@ -335,7 +348,7 @@ class CalculationParamsView(APIView):
         },
     )
     def get(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         params = CalculationParamsService.get_for_restaurant(profile)
         return Response(CalculationParamsSerializer(params).data)
 
@@ -350,7 +363,7 @@ class CalculationParamsView(APIView):
         },
     )
     def post(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         # Check if already exists
         try:
             CalculationParamsService.get_for_restaurant(profile)
@@ -377,7 +390,7 @@ class CalculationParamsView(APIView):
         },
     )
     def put(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         params = CalculationParamsService.get_for_restaurant(profile)
         serializer = CalculationParamsSerializer(params, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -395,7 +408,7 @@ class CalculationParamsView(APIView):
         },
     )
     def patch(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         params = CalculationParamsService.get_for_restaurant(profile)
         serializer = CalculationParamsSerializer(params, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -411,7 +424,59 @@ class CalculationParamsView(APIView):
         },
     )
     def delete(self, request):
-        profile = request.user.restaurant_profile
+        profile = get_user_restaurant(request.user)
         params = CalculationParamsService.get_for_restaurant(profile)
         CalculationParamsService.delete(params)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ─────────────────────────── Shifts ────────────────────────────
+
+
+@extend_schema(tags=['restaurant-shifts'])
+class ShiftDefinitionListCreateView(APIView):
+    permission_classes = [IsRestaurantOwnerOnly]
+
+    @extend_schema(operation_id='v1_restaurants_shifts_list', responses=ShiftDefinitionSerializer(many=True))
+    def get(self, request):
+        profile = get_user_restaurant(request.user)
+        return Response(ShiftDefinitionSerializer(ShiftDefinitionService.list_for_restaurant(profile), many=True).data)
+
+    @extend_schema(operation_id='v1_restaurants_shifts_create', request=ShiftDefinitionSerializer, responses={201: ShiftDefinitionSerializer})
+    def post(self, request):
+        profile = get_user_restaurant(request.user)
+        serializer = ShiftDefinitionSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        shift = ShiftDefinitionService.create(profile, serializer.validated_data)
+        return Response(ShiftDefinitionSerializer(shift).data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(tags=['restaurant-shifts'])
+class ShiftDefinitionDetailView(APIView):
+    permission_classes = [IsRestaurantOwnerOnly]
+
+    def _get_shift(self, request, pk):
+        return ShiftDefinitionService.get_by_id(pk, get_user_restaurant(request.user))
+
+    @extend_schema(operation_id='v1_restaurants_shifts_retrieve', responses=ShiftDefinitionSerializer)
+    def get(self, request, pk):
+        return Response(ShiftDefinitionSerializer(self._get_shift(request, pk)).data)
+
+    @extend_schema(operation_id='v1_restaurants_shifts_update', request=ShiftDefinitionSerializer, responses=ShiftDefinitionSerializer)
+    def put(self, request, pk):
+        shift = self._get_shift(request, pk)
+        serializer = ShiftDefinitionSerializer(shift, data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        return Response(ShiftDefinitionSerializer(ShiftDefinitionService.update(shift, serializer.validated_data)).data)
+
+    @extend_schema(operation_id='v1_restaurants_shifts_partial_update', request=ShiftDefinitionSerializer, responses=ShiftDefinitionSerializer)
+    def patch(self, request, pk):
+        shift = self._get_shift(request, pk)
+        serializer = ShiftDefinitionSerializer(shift, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        return Response(ShiftDefinitionSerializer(ShiftDefinitionService.update(shift, serializer.validated_data, partial=True)).data)
+
+    @extend_schema(operation_id='v1_restaurants_shifts_delete', responses={204: None})
+    def delete(self, request, pk):
+        ShiftDefinitionService.deactivate(self._get_shift(request, pk))
         return Response(status=status.HTTP_204_NO_CONTENT)
