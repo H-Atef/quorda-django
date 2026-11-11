@@ -50,7 +50,7 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_channel(self, obj):
+    def get_channel(self, obj) -> str:
         return 'dine_in' if obj.is_indoor else 'delivery'
 
 

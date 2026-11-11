@@ -54,6 +54,7 @@ class CashierDetailView(APIView):
 
 class CashierSetVipPermissionView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurant]
+    serializer_class = SetVipPermissionSerializer
 
     @extend_schema(tags=['cashiers'], request=SetVipPermissionSerializer)
     def post(self, request):
