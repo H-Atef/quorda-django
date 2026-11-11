@@ -4,6 +4,7 @@ from apps.users.views import auth_views, user_views, restaurant_profile_views, c
 urlpatterns = [
     path('auth/register/', auth_views.RegisterView.as_view(), name='register'),
     path('auth/login/', auth_views.LoginView.as_view(), name='login'),
+    path('auth/refresh/', auth_views.RefreshView.as_view(), name='token-refresh'),
     path('auth/logout/', auth_views.LogoutView.as_view(), name='logout'),
 
     # Users

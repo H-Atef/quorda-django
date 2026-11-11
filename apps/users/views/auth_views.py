@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 from apps.users.serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from apps.users.services.auth_service import AuthService
@@ -110,4 +111,44 @@ class LogoutView(APIView):
         result = AuthService.logout_user(refresh_token)
         response = Response(result, status=status.HTTP_200_OK)
         response.delete_cookie('refresh_token')
+        return response
+
+
+@extend_schema(tags=['auth'])
+class RefreshView(APIView):
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Refresh access token",
+        description="Obtain a new access token using a refresh token from the request body or cookie.",
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'refresh': {'type': 'string', 'description': 'Optional if refresh token is sent in cookie'}
+                }
+            }
+        },
+        responses={
+            200: OpenApiResponse(description="Token refreshed successfully", response=None),
+            401: OpenApiResponse(description="Invalid or expired refresh token", response=None),
+        }
+    )
+    def post(self, request):
+        refresh_token = request.data.get('refresh') or request.data.get('refresh_token') or request.COOKIES.get('refresh_token')
+        if not refresh_token:
+            raise AuthenticationFailed('Refresh token is required.')
+        serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        response = Response(data, status=status.HTTP_200_OK)
+        if data.get('refresh'):
+            response.set_cookie(
+                key='refresh_token',
+                value=data['refresh'],
+                httponly=True,
+                secure=False,
+                samesite='Lax',
+            )
         return response
