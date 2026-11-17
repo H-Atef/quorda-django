@@ -118,3 +118,6 @@ temp/
 **/migrations/*
 !**/migrations/
 !**/migrations/__init__.py
+
+perf.py
+perf

@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 from apps.users.serializers import RegisterSerializer, LoginSerializer, UserSerializer
@@ -140,7 +141,10 @@ class RefreshView(APIView):
         if not refresh_token:
             raise AuthenticationFailed('Refresh token is required.')
         serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:  # blacklisted / expired / malformed -> 401 instead of 500
+            raise InvalidToken(exc.args[0]) from exc
         data = serializer.validated_data
         response = Response(data, status=status.HTTP_200_OK)
         if data.get('refresh'):
