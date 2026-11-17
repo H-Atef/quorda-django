@@ -3,6 +3,8 @@ from typing import Any, Dict, Optional, Set
 
 from django.db import transaction, IntegrityError
 from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import make_password
+from django.db.models import Q
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -41,6 +43,9 @@ class AuthService:
     # Union of all profile fields across all roles (so we pop them all)
     ALL_PROFILE_FIELDS = set().union(*PROFILE_FIELDS.values())
 
+    # Precompiled email regex (avoids recompiling on every login).
+    EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
     @classmethod
     def get_profile_fields_for_role(cls, role: str) -> Set[str]:
         """Return the set of profile fields for a given role, or an empty set."""
@@ -51,13 +56,15 @@ class AuthService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    @transaction.atomic
     def register_user(validated_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new user and its role-specific profile.
 
         Any field that belongs to any profile is automatically popped from
         validated_data so it never reaches User(**validated_data).
+
+        Password is hashed *before* opening the transaction so the DB lock
+        window only covers the two INSERTs, not the CPU-bound hashing.
 
         Args:
             validated_data: cleaned data from the registration serializer.
@@ -67,9 +74,9 @@ class AuthService:
             Dict with 'user' and success message.
 
         Raises:
-            ValidationError: if profile creation fails (e.g., duplicate name).
+            ValidationError: if the username/email is taken or profile creation fails.
         """
-        # Apply custom validations (e.g., username without '@', no admin role)
+        # Apply custom validations (e.g., username without '@', no admin role).
         validated_data = validate_registration_data(validated_data)
 
         role = validated_data.get('role')
@@ -82,14 +89,21 @@ class AuthService:
         for field in AuthService.ALL_PROFILE_FIELDS:
             profile_data[field] = validated_data.pop(field, None)
 
-        # --- Create the User with the remaining fields ---
+        # --- Hash password BEFORE opening the transaction (CPU-bound work) ---
         password = validated_data.pop('password')
-        user = User(**validated_data)   # only user model fields remain
-        user.set_password(password)
-        user.save()
+        hashed_password = make_password(password)
 
-        # --- Create the role‑dependent profile, passing the full profile_data ---
-        AuthService._create_role_profile(user, profile_data)
+        # --- Create the User and its profile inside a short transaction ---
+        user = User(**validated_data)   # only user model fields remain
+        user.password = hashed_password
+        try:
+            with transaction.atomic():
+                user.save()
+                AuthService._create_role_profile(user, profile_data)
+        except IntegrityError as exc:
+            raise ValidationError(
+                {"username": ["This username or email is already taken."]}
+            ) from exc
 
         return {
             'user': user,
@@ -150,20 +164,19 @@ class AuthService:
         """
         Authenticate by username or email.
 
+        Single database lookup regardless of whether the identifier is an
+        email or a username, then a single password hash check.
+
         Returns dict with user, refresh token, and access token.
         """
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        user_obj = User.objects.filter(
+            Q(username=username_or_email) | Q(email=username_or_email)
+        ).first()
 
-        if re.match(email_pattern, username_or_email):
-            try:
-                user = User.objects.get(email=username_or_email)
-                username = user.username
-            except User.DoesNotExist:
-                raise AuthenticationFailed('Invalid credentials.')
-        else:
-            username = username_or_email
+        if user_obj is None:
+            raise AuthenticationFailed('Invalid credentials.')
 
-        user = authenticate(username=username, password=password)
+        user = authenticate(username=user_obj.username, password=password)
         if user is None:
             raise AuthenticationFailed('Invalid credentials.')
 
@@ -180,15 +193,15 @@ class AuthService:
 
     @staticmethod
     def logout_user(refresh_token: str) -> Dict[str, str]:
-        """Blacklist the refresh token."""
+        """Blacklist the refresh token atomically."""
         if not refresh_token:
             raise AuthenticationFailed('No refresh token provided.')
 
         try:
             outstanding = OutstandingToken.objects.get(token=refresh_token)
-            BlacklistedToken.objects.create(token=outstanding)
-            return {"message": "Successfully logged out."}
-        except ObjectDoesNotExist:
+        except OutstandingToken.DoesNotExist:
             raise AuthenticationFailed('Refresh token does not exist or is already invalid.')
-        except Exception as e:
-            raise AuthenticationFailed(f'Error during logout: {str(e)}')
+
+        # Atomic blacklist: concurrent logouts of the same token won't duplicate.
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+        return {"message": "Successfully logged out."}
