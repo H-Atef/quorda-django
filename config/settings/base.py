@@ -55,6 +55,8 @@ LOCAL_APPS = [
     'apps.users',
     'apps.restaurants',
     'apps.orders',
+    'apps.cart',
+    'apps.common',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -170,6 +172,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'apps.cart.exceptions.custom_exception_handler',
 }
 
 # ---------------------------------------------------------------------------
@@ -213,6 +216,8 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     
     'ENUM_NAME_OVERRIDES': {
+        'CartStatusEnum': 'apps.cart.models.cart.Cart.Status',
+        'OrderStatusEnum': 'apps.orders.models.order.Order.Status',
     },
     'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
     
