@@ -32,6 +32,11 @@ class Order(models.Model):
         editable=False,
         related_name='created_orders',
     )
+    order_number = models.CharField(
+        max_length=20,
+        unique=True,
+        editable=False
+    )
     is_indoor = models.BooleanField(
         default=True,
         help_text='True = dine-in (no customer required). False = delivery (customer required).',
