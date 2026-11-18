@@ -34,8 +34,7 @@ class Order(models.Model):
     )
     order_number = models.CharField(
         max_length=20,
-        unique=True,
-        editable=False
+        editable=False,
     )
     is_indoor = models.BooleanField(
         default=True,
@@ -90,8 +89,25 @@ class Order(models.Model):
                 total += float(item.menu_item.price) * item.quantity
         return total
 
+    def save(self, *args, **kwargs):
+        
+        if not self.order_number:
+            # Get the last order for THIS restaurant
+            last_order = Order.objects.filter(
+                restaurant=self.restaurant
+            ).order_by('-id').first()
+            
+            if last_order:
+                # Extract number from "ORD-1001" -> 1001
+                last_num = int(last_order.order_number.split('-')[-1])
+                self.order_number = f"ORD-{last_num + 1}"
+            else:
+                # First order for this restaurant
+                self.order_number = "ORD-1001"
+                
+        super().save(*args, **kwargs)
+
     def recalculate_priority_score(self, items=None) -> None:
-        """Recompute and persist priority_score."""
         from apps.orders.helpers.priority_calculator import PriorityCalculator
         self.priority_score = PriorityCalculator.compute_score(self, items=items)
         self.save(update_fields=['priority_score', 'updated_at'])

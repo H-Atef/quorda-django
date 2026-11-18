@@ -6,30 +6,33 @@ An order is "simple" if:
   - max category priority among its items >= criteria.min_category_priority
 """
 
+from django.db.models import Sum, Max
+from django.db.models.functions import Coalesce
 
 class SimpleOrderDetector:
-
+    
     @staticmethod
     def detect(orders, criteria):
         """
-        orders   : iterable of apps.orders.models.Order (pre-fetched order_items + menu_item + category)
-        criteria : apps.restaurants.models.Criteria instance
-        Returns  : list of matching Order instances
+        Detects "simple" orders based on the given criteria.
+        An order is "simple" if:
+          - total_quantity <= criteria.max_quantity
+          - max category priority among its items >= criteria.min_category_priority
+        
+        Args:
+            orders: QuerySet of Order instances (e.g., Order.objects.all()).
+            criteria: Object with `max_quantity` and `min_category_priority` attributes.
+            
+        Returns:
+            QuerySet of matching Order instances.
         """
-        simple = []
-        for order in orders:
-            items = list(order.order_items.all())
-            total_qty = sum(i.quantity for i in items)
-            if total_qty > criteria.max_quantity:
-                continue
-            max_cat_prio = max(
-                (
-                    i.menu_item.category.priority
-                    for i in items
-                    if i.menu_item is not None and i.menu_item.category is not None
-                ),
-                default=0,
-            )
-            if max_cat_prio >= criteria.min_category_priority:
-                simple.append(order)
-        return simple
+        
+        return orders.annotate(
+            # Coalesce ensures total_qty is 0 if the order has no items
+            total_qty=Coalesce(Sum('order_items__quantity'), 0),
+            # Coalesce ensures max_cat_prio is 0 if items have no category
+            max_cat_prio=Coalesce(Max('order_items__menu_item__category__priority'), 0)
+        ).filter(
+            total_qty__lte=criteria.max_quantity,
+            max_cat_prio__gte=criteria.min_category_priority
+        )
