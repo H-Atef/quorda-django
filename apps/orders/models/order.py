@@ -32,10 +32,6 @@ class Order(models.Model):
         editable=False,
         related_name='created_orders',
     )
-    order_number = models.CharField(
-        max_length=20,
-        editable=False,
-    )
     is_indoor = models.BooleanField(
         default=True,
         help_text='True = dine-in (no customer required). False = delivery (customer required).',
@@ -95,24 +91,6 @@ class Order(models.Model):
             elif item.menu_item:
                 total += float(item.menu_item.price) * item.quantity
         return total
-
-    def save(self, *args, **kwargs):
-        if not self.order_number:
-            self.order_number = self._next_order_number()
-        super().save(*args, **kwargs)
-
-    def _next_order_number(self) -> str:
-        """Highest "ORD-<n>" already used by this restaurant, plus one."""
-        last_num = 1000
-        numbers = Order.objects.filter(
-            restaurant=self.restaurant,
-            order_number__startswith='ORD-',
-        ).values_list('order_number', flat=True)
-        for number in numbers:
-            suffix = number.rsplit('-', 1)[-1]
-            if suffix.isdigit():
-                last_num = max(last_num, int(suffix))
-        return f"ORD-{last_num + 1}"
 
     def recalculate_priority_score(self, items=None) -> None:
         from apps.orders.helpers.priority_calculator import PriorityCalculator

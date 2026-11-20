@@ -32,6 +32,7 @@ class OrderItemReadSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     """Read serializer. Shared by restaurant-owner and customer views."""
+    order_number = serializers.SerializerMethodField()
     order_items = OrderItemReadSerializer(many=True, read_only=True)
     total_quantity = serializers.ReadOnlyField()
     total_prep_time = serializers.ReadOnlyField()
@@ -43,12 +44,15 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'restaurant', 'customer', 'created_by', 'is_indoor', 'channel', 'status',
+            'id', 'order_number', 'restaurant', 'customer', 'created_by', 'is_indoor', 'channel', 'status',
             'special_flag', 'priority_score', 'batch_number', 'shift', 'shift_name', 'order_items',
             'total_quantity', 'total_prep_time', 'total_cost',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields
+
+    def get_order_number(self, obj) -> str:
+        return f"ORD-{str(obj.id)[:4].upper()}"
 
     def get_channel(self, obj) -> str:
         return 'dine_in' if obj.is_indoor else 'delivery'
