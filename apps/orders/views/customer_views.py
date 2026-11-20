@@ -4,21 +4,41 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from apps.orders.permissions import IsOrderCustomer
 from apps.orders.serializers import CustomerOrderCreateSerializer, CustomerOrderUpdateSerializer, OrderSerializer
 from apps.orders.services.customer_order_service import CustomerOrderService
+from apps.orders.views.query_params import parse_page, parse_page_size
+from apps.common.pagination import paginate
+
+
+PAGE_PARAM = OpenApiParameter(
+    name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=1, description='Page number.',
+)
+PAGE_SIZE_PARAM = OpenApiParameter(
+    name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=20, description='Number of items per page.',
+)
 
 
 @extend_schema(tags=['Customer Orders'])
 class CustomerOrderListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary='List my delivery orders', responses=OrderSerializer(many=True))
+    @extend_schema(
+        summary='List my delivery orders',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
+        responses=OrderSerializer(many=True),
+    )
     def get(self, request):
-        orders = CustomerOrderService.get_customer_orders_qs(request.user)
-        return Response(OrderSerializer(orders, many=True).data)
+        page = parse_page(request)
+        page_size = parse_page_size(request)
+        qs = CustomerOrderService.get_customer_orders_qs(request.user)
+        items, meta = paginate(qs, page, page_size)
+        return Response({'results': OrderSerializer(items, many=True).data, **meta})
 
     @extend_schema(summary='Place a new delivery order', request=CustomerOrderCreateSerializer, responses={201: OrderSerializer})
     def post(self, request):

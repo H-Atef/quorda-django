@@ -9,7 +9,8 @@ from drf_spectacular.types import OpenApiTypes
 from apps.orders.permissions import IsRestaurantOwner
 from apps.orders.serializers import OrderSerializer
 from apps.orders.services.order_service import OrderService
-from apps.orders.views.query_params import parse_int, parse_window_size
+from apps.orders.views.query_params import parse_int, parse_window_size, parse_page, parse_page_size
+from apps.common.pagination import paginate
 from apps.users.helpers.restaurant import get_user_restaurant
 
 
@@ -25,6 +26,18 @@ MODE_PARAM = OpenApiParameter(
     name='mode', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY,
     required=False, enum=['completed', 'all'], default='completed',
     description='Reset mode: "completed" (default, safe) resets only done/cancelled orders; "all" resets everything but requires no pending orders.',
+)
+PAGE_PARAM = OpenApiParameter(
+    name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=1, description='Page number.',
+)
+PAGE_SIZE_PARAM = OpenApiParameter(
+    name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=20, description='Number of items per page.',
+)
+BATCH_LIMIT_PARAM = OpenApiParameter(
+    name='batch_limit', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, description='Max number of batches to return.',
 )
 
 
@@ -51,14 +64,23 @@ class BatchSummaryAPIView(APIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
-    @extend_schema(summary='Pending count per batch', parameters=[WINDOW_SIZE_PARAM])
+    @extend_schema(
+        summary='Pending count per batch',
+        parameters=[WINDOW_SIZE_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM],
+    )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
         window_size = parse_window_size(request)
+        page = parse_page(request)
+        page_size = parse_page_size(request)
+        batch_limit = parse_batch_limit(request)
         summary = OrderService._batch_summary(restaurant)
         for row in summary:
             row['holes'] = max(0, window_size - row['pending'])
-        return Response(summary)
+        if batch_limit is not None:
+            summary = summary[:batch_limit]
+        items, meta = paginate(summary, page, page_size)
+        return Response({'results': items, **meta})
 
 
 @extend_schema(tags=['Batch Management'])

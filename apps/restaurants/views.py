@@ -1,4 +1,5 @@
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -15,6 +16,17 @@ from apps.restaurants.services import (
     PublicRestaurantsService, ShiftDefinitionService,
 )
 from apps.users.helpers.restaurant import get_user_restaurant
+from apps.common.pagination import paginate, parse_page, parse_page_size
+
+
+PAGE_PARAM = OpenApiParameter(
+    name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=1, description='Page number.',
+)
+PAGE_SIZE_PARAM = OpenApiParameter(
+    name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=20, description='Number of items per page.',
+)
 
 
 
@@ -29,11 +41,15 @@ class RestaurantListView(APIView):
         tags=['public-restaurants'],
         operation_id='v1_public_restaurants_list',
         summary='List all active restaurants',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
         responses={200: OpenApiResponse(response=PublicRestaurantProfileSerializer(many=True))},
     )
     def get(self, request):
-        restaurants = PublicRestaurantsService.list_active_restaurants()
-        return Response(PublicRestaurantProfileSerializer(restaurants, many=True).data)
+        page = parse_page(request)
+        page_size = parse_page_size(request)
+        qs = PublicRestaurantsService.list_active_restaurants()
+        items, meta = paginate(qs, page, page_size)
+        return Response({'results': PublicRestaurantProfileSerializer(items, many=True).data, **meta})
 
 
 class RestaurantDetailView(APIView):
@@ -60,14 +76,18 @@ class RestaurantMenuItemsView(APIView):
         tags=['public-restaurants'],
         operation_id='v1_public_restaurant_menu_items',
         summary='List all available menu items for a specific restaurant',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
         responses={
             200: OpenApiResponse(response=MenuItemSerializer(many=True)),
             404: OpenApiResponse(description='Restaurant not found'),
         },
     )
     def get(self, request, pk):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         items = PublicRestaurantsService.list_menu_items(pk)
-        return Response(MenuItemSerializer(items, many=True).data)
+        paginated, meta = paginate(items, page, page_size)
+        return Response({'results': MenuItemSerializer(paginated, many=True).data, **meta})
 
 
 # ─────────────────────────── Categories ────────────────────────────
@@ -85,12 +105,16 @@ class CategoryListCreateView(APIView):
         operation_id='v1_restaurants_categories_list',
         summary='List categories',
         description='Returns all categories belonging to the authenticated restaurant.',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
         responses={200: OpenApiResponse(response=CategorySerializer(many=True))},
     )
     def get(self, request):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         profile = get_user_restaurant(request.user)
         categories = CategoryService.list_for_restaurant(profile)
-        return Response(CategorySerializer(categories, many=True).data)
+        items, meta = paginate(categories, page, page_size)
+        return Response({'results': CategorySerializer(items, many=True).data, **meta})
 
     @extend_schema(
         tags=['restaurant-categories'],
@@ -184,12 +208,16 @@ class MenuItemListCreateView(APIView):
         operation_id='v1_restaurants_menu_items_list',
         summary='List menu items',
         description='Returns all menu items of the authenticated restaurant. Category is optional.',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
         responses={200: OpenApiResponse(response=MenuItemSerializer(many=True))},
     )
     def get(self, request):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         profile = get_user_restaurant(request.user)
         items = MenuItemService.list_for_restaurant(profile)
-        return Response(MenuItemSerializer(items, many=True).data)
+        paginated, meta = paginate(items, page, page_size)
+        return Response({'results': MenuItemSerializer(paginated, many=True).data, **meta})
 
     @extend_schema(
         tags=['restaurant-menu-items'],
@@ -437,10 +465,18 @@ class CalculationParamsView(APIView):
 class ShiftDefinitionListCreateView(APIView):
     permission_classes = [IsRestaurantOwnerOnly]
 
-    @extend_schema(operation_id='v1_restaurants_shifts_list', responses=ShiftDefinitionSerializer(many=True))
+    @extend_schema(
+        operation_id='v1_restaurants_shifts_list',
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
+        responses=ShiftDefinitionSerializer(many=True)
+    )
     def get(self, request):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         profile = get_user_restaurant(request.user)
-        return Response(ShiftDefinitionSerializer(ShiftDefinitionService.list_for_restaurant(profile), many=True).data)
+        shifts = ShiftDefinitionService.list_for_restaurant(profile)
+        items, meta = paginate(shifts, page, page_size)
+        return Response({'results': ShiftDefinitionSerializer(items, many=True).data, **meta})
 
     @extend_schema(operation_id='v1_restaurants_shifts_create', request=ShiftDefinitionSerializer, responses={201: ShiftDefinitionSerializer})
     def post(self, request):

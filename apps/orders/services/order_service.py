@@ -193,6 +193,8 @@ class OrderService:
         statuses=None,           # None = [PENDING, PREPARING]
         windowed=True,           # True = batch-sorted; False = priority-only
         limit=None,
+        batch_limit=None,        # Max number of batches to return (by batch_number ASC)
+        ordering=None,           # Optional ordering override, e.g. '-created_at'
     ):
         """
         Universal filter + sort.
@@ -203,6 +205,9 @@ class OrderService:
 
         Unwindowed sort:
             -priority_score DESC, created_at ASC  (pure priority — can starve).
+
+        batch_limit: restrict results to the first N batches (ordered by batch_number ASC).
+        ordering: optional override ordering, e.g. '-created_at' or 'priority_score'.
         """
         qs = OrderService._base_qs(restaurant)
 
@@ -218,7 +223,19 @@ class OrderService:
         if is_indoor is not None:
             qs = qs.filter(is_indoor=is_indoor)
 
-        if windowed:
+        if batch_limit is not None:
+            batch_nums = (
+                Order.objects
+                .filter(restaurant=restaurant, status__in=statuses)
+                .values_list('batch_number', flat=True)
+                .distinct()
+                .order_by('batch_number')[:batch_limit]
+            )
+            qs = qs.filter(batch_number__in=batch_nums)
+
+        if ordering:
+            qs = qs.order_by(*[f.strip() for f in ordering.split(',') if f.strip()])
+        elif windowed:
             if vip_only is True:
                 # Pure VIP: oldest-first within batch
                 qs = qs.order_by('batch_number', 'created_at')

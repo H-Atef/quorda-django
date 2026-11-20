@@ -1,4 +1,5 @@
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.types import OpenApiTypes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,6 +9,17 @@ from apps.users.serializers import UserSerializer, UserUpdateSerializer
 from apps.users.permissions import IsAdmin
 from apps.users.services.user_service import UserService
 from apps.users.helpers.constants import UserRole
+from apps.common.pagination import paginate, parse_page, parse_page_size
+
+
+PAGE_PARAM = OpenApiParameter(
+    name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=1, description='Page number.',
+)
+PAGE_SIZE_PARAM = OpenApiParameter(
+    name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=20, description='Number of items per page.',
+)
 
 
 class UserListView(APIView):
@@ -18,15 +30,19 @@ class UserListView(APIView):
         summary="List all users",
         description="Admin only",
         tags=['users'],
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
         responses={
             200: OpenApiResponse(response=UserSerializer(many=True), description="List of users"),
             403: OpenApiResponse(description="Forbidden", response=None),
         }
     )
     def get(self, request):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         users = UserService.list_users()
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        items, meta = paginate(users, page, page_size)
+        serializer = UserSerializer(items, many=True)
+        return Response({'results': serializer.data, **meta}, status=status.HTTP_200_OK)
 
 
 class UserDetailView(APIView):

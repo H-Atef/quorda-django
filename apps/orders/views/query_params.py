@@ -82,3 +82,29 @@ def parse_limit(request):
 
 def parse_window_size(request, default=10):
     return parse_int(request, 'window_size', default=default, minimum=1)
+
+
+def parse_page(request, default=1):
+    return parse_int(request, 'page', default=default, minimum=1)
+
+
+def parse_page_size(request, default=20, maximum=100):
+    return parse_int(request, 'page_size', default=default, minimum=1, maximum=maximum)
+
+
+def parse_batch_limit(request, default=None):
+    return parse_int(request, 'batch_limit', default=default, minimum=1)
+
+
+def parse_ordering(request, default=None, allowed=None):
+    raw = request.query_params.get('ordering', default)
+    if raw is None:
+        return None
+    if allowed:
+        fields = [f.lstrip('-') for f in raw.split(',')]
+        invalid = [f for f in fields if f not in allowed]
+        if invalid:
+            raise ValidationError({
+                'ordering': f'Invalid field(s): {", ".join(invalid)}. Allowed: {", ".join(sorted(allowed))}.'
+            })
+    return raw

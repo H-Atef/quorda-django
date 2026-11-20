@@ -2,7 +2,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from apps.users.helpers.restaurant import get_user_restaurant
 from apps.users.permissions import IsRestaurant
@@ -13,16 +14,34 @@ from apps.users.serializers import (
     SetVipPermissionSerializer,
 )
 from apps.users.services.cashier_service import CashierService
+from apps.common.pagination import paginate, parse_page, parse_page_size
+
+
+PAGE_PARAM = OpenApiParameter(
+    name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=1, description='Page number.',
+)
+PAGE_SIZE_PARAM = OpenApiParameter(
+    name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+    required=False, default=20, description='Number of items per page.',
+)
 
 
 class CashierListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurant]
 
-    @extend_schema(tags=['cashiers'], responses=CashierUserSerializer(many=True))
+    @extend_schema(
+        tags=['cashiers'],
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM],
+        responses=CashierUserSerializer(many=True)
+    )
     def get(self, request):
+        page = parse_page(request)
+        page_size = parse_page_size(request)
         restaurant = get_user_restaurant(request.user)
         cashiers = CashierService.list_for_restaurant(restaurant)
-        return Response(CashierUserSerializer([c.user for c in cashiers], many=True).data)
+        items, meta = paginate(cashiers, page, page_size)
+        return Response({'results': CashierUserSerializer([c.user for c in items], many=True).data, **meta})
 
     @extend_schema(tags=['cashiers'], request=CashierCreateSerializer, responses={201: CashierUserSerializer})
     def post(self, request):
