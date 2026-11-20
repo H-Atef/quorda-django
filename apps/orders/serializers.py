@@ -15,6 +15,7 @@ class OrderItemWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = ['menu_item', 'quantity']
+        extra_kwargs = {'menu_item': {'required': True, 'allow_null': False}}
 
     def validate_quantity(self, value):
         if value < 1:

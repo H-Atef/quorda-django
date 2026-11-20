@@ -596,8 +596,8 @@ class CartIntegrationTests(CartTestMixin, APITestCase):
         self.client.post('/api/v1/cart/checkout/', {}, format='json')
         resp = self.client.get('/api/v1/orders/customers/')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 1)
-        self.assertEqual(resp.data[0]['customer'], self.customer.id)
+        self.assertEqual(len(resp.data['results']), 1)
+        self.assertEqual(resp.data['results'][0]['customer'], self.customer.id)
 
     def test_other_customer_does_not_see_order(self):
         self.client.post('/api/v1/cart/items/', {'menu_item': str(self.item.id), 'quantity': 1}, format='json')
@@ -605,7 +605,7 @@ class CartIntegrationTests(CartTestMixin, APITestCase):
         self.authenticate(self.client, self.other_customer)
         resp = self.client.get('/api/v1/orders/customers/')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 0)
+        self.assertEqual(len(resp.data['results']), 0)
 
     def test_order_appears_in_restaurant_kitchen_queue_with_priority(self):
         self.client.post('/api/v1/cart/items/', {'menu_item': str(self.item.id), 'quantity': 1}, format='json')
@@ -613,8 +613,8 @@ class CartIntegrationTests(CartTestMixin, APITestCase):
         self.authenticate(self.client, self.restaurant.user)
         resp = self.client.get('/api/v1/orders/windowed/')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 1)
-        self.assertIn('priority_score', resp.data[0])
+        self.assertEqual(len(resp.data['results']), 1)
+        self.assertIn('priority_score', resp.data['results'][0])
 
 
 @override_settings(**TEST_SETTINGS)

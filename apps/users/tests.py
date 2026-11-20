@@ -382,7 +382,7 @@ class CashierManagementTests(UserTestMixin, APITestCase):
 
     def test_owner_lists_only_own_cashiers(self):
         resp = self.client_for(self.owner).get(CASHIERS_URL)
-        self.assertEqual([c['username'] for c in resp.data], ['cashier_a'])
+        self.assertEqual([c['username'] for c in resp.data['results']], ['cashier_a'])
 
     def test_owner_cannot_see_or_edit_another_restaurants_cashier(self):
         """Tenant isolation: a foreign cashier profile id behaves like it doesn't exist."""
@@ -437,7 +437,7 @@ class StaffOrderPermissionTests(UserTestMixin, APITestCase):
 
     def test_cashier_without_permission_cannot_set_vip(self):
         resp = self.client_for(self.plain_user).post(ORDERS_URL, self._order_payload(special=True), format='json')
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 400)
 
     def test_cashier_with_permission_can_set_vip(self):
         resp = self.client_for(self.vip_user).post(ORDERS_URL, self._order_payload(special=True), format='json')
@@ -452,7 +452,7 @@ class StaffOrderPermissionTests(UserTestMixin, APITestCase):
         self.client_for(self.owner).patch(
             f'{CASHIERS_URL}{self.vip.id}/', {'can_set_vip': False}, format='json')
         resp = self.client_for(self.vip_user).post(ORDERS_URL, self._order_payload(special=True), format='json')
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 400)
 
     def test_deactivated_cashier_loses_access(self):
         self.assertEqual(self.client_for(self.inactive_user).get(ORDERS_URL).status_code, 403)

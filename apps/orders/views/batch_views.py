@@ -9,7 +9,9 @@ from drf_spectacular.types import OpenApiTypes
 from apps.orders.permissions import IsRestaurantOwner
 from apps.orders.serializers import OrderSerializer
 from apps.orders.services.order_service import OrderService
-from apps.orders.views.query_params import parse_int, parse_window_size, parse_page, parse_page_size
+from apps.orders.views.query_params import (
+    parse_int, parse_window_size, parse_page, parse_page_size, parse_batch_limit,
+)
 from apps.common.pagination import paginate
 from apps.users.helpers.restaurant import get_user_restaurant
 

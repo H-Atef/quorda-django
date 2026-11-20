@@ -1,5 +1,6 @@
 from rest_framework.exceptions import ValidationError
 
+from apps.orders.helpers.order_sorter import OrderSorter
 from apps.orders.models import Order, OrderItem
 from apps.orders.services.order_service import _make_items
 
@@ -41,6 +42,8 @@ class CustomerOrderService:
             is_indoor=False,
             **validated_data,
         )
+        OrderSorter.assign_batch_number(order, window_size=10)
+        order.save(update_fields=['batch_number'])
         _make_items(order, items_data)
         order.recalculate_priority_score()
         return order

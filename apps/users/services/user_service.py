@@ -9,7 +9,7 @@ class UserService:
     @staticmethod
     def list_users():
         """Return all users (admin only)."""
-        return User.objects.all()
+        return User.objects.all().order_by('username')
 
     @staticmethod
     def get_user_by_id(user_id):

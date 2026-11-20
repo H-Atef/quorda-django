@@ -9,7 +9,7 @@ from apps.users.services.user_service import UserService
 class CashierService:
     @staticmethod
     def list_for_restaurant(restaurant):
-        return CashierProfile.objects.filter(restaurant=restaurant).select_related('user', 'restaurant')
+        return CashierProfile.objects.filter(restaurant=restaurant).select_related('user', 'restaurant').order_by('user__username')
 
     @staticmethod
     @transaction.atomic
