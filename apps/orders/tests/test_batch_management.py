@@ -132,13 +132,13 @@ class BatchSummaryTests(OrdersTestCase):
 
     def test_counts_active_orders_per_batch(self):
         make_order(self.restaurant, batch_number=1)
-        make_order(self.restaurant, batch_number=1, status='preparing')
+        make_order(self.restaurant, batch_number=1, status='pending')
         make_order(self.restaurant, batch_number=1, status='done')
         make_order(self.restaurant, batch_number=2)
         self.assertEqual(OrderService._batch_summary(self.restaurant), [
             {'batch_number': 1, 'pending': 2}, {'batch_number': 2, 'pending': 1},
         ])
         self.assertEqual(
-            BatchService._batch_summary(self.restaurant, ('pending', 'preparing')),
+            BatchService._batch_summary(self.restaurant, ('pending',)),
             OrderService._batch_summary(self.restaurant),
         )

@@ -128,15 +128,15 @@ class ClaimViewTests(OrdersAPITestCase):
         order = make_order(self.restaurant, [(self.fries, 1)])
         response = self.client.post(self.url(order))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['status'], 'preparing')
+        self.assertEqual(response.data['status'], 'pending')
 
-    def test_double_claim_is_rejected(self):
+    def test_double_claim_is_allowed(self):
         order = make_order(self.restaurant, [(self.fries, 1)])
         self.client.post(self.url(order))
-        self.assertEqual(self.client.post(self.url(order)).status_code, 400)
+        self.assertEqual(self.client.post(self.url(order)).status_code, 200)
 
     def test_claim_requires_pending(self):
-        for status in ('preparing', 'done', 'cancelled'):
+        for status in ('done', 'cancelled'):
             with self.subTest(status=status):
                 self.assertEqual(self.client.post(self.url(make_order(self.restaurant, status=status))).status_code, 400)
 

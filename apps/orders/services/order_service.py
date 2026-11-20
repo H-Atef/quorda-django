@@ -11,7 +11,7 @@ from apps.users.helpers.constants import UserRole
 from apps.users.models import RestaurantProfile
 
 
-EDITABLE_ORDER_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+EDITABLE_ORDER_STATUSES = (Order.Status.PENDING,)
 
 
 def _assert_can_set_vip(actor, current_flag, requested_flag):
@@ -110,7 +110,7 @@ class OrderService:
         if order.status not in EDITABLE_ORDER_STATUSES:
             raise ValidationError(
                 f'Cannot modify an order that is "{order.status}". '
-                f'Only pending or preparing orders can be modified.'
+                f'Only pending orders can be modified.'
             )
 
     @staticmethod
@@ -190,7 +190,7 @@ class OrderService:
         *,
         vip_only=None,           # None = all; True = VIPs; False = non-VIP
         is_indoor=None,          # None = both; True = dine-in; False = delivery
-        statuses=None,           # None = [PENDING, PREPARING]
+        statuses=None,           # None = [PENDING]
         windowed=True,           # True = batch-sorted; False = priority-only
         limit=None,
         batch_limit=None,        # Max number of batches to return (by batch_number ASC)
@@ -394,7 +394,7 @@ class OrderService:
             Reset only DONE/CANCELLED orders. Pending orders keep their batches.
 
         mode='all' (dangerous):
-            Reset EVERY order. Blocked if any pending/preparing order exists.
+            Reset EVERY order. Blocked if any pending order exists.
             Use at shift start when the kitchen is empty.
 
         Returns:
@@ -409,7 +409,7 @@ class OrderService:
             if active > 0:
                 raise ValidationError({
                     'mode': (
-                        f'Cannot reset all batches: {active} pending/preparing '
+                        f'Cannot reset all batches: {active} pending '
                         f'orders exist. Complete or cancel them first, or use '
                         f'mode=completed.'
                     )
@@ -454,8 +454,6 @@ class OrderService:
         )
         if order is None:
             raise ValidationError({'order': 'Already claimed or not pending.'})
-        order.status = Order.Status.PREPARING
-        order.save(update_fields=['status', 'updated_at'])
         return order
 
 

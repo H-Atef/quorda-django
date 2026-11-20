@@ -182,9 +182,9 @@ class DetailTests(OrdersAPITestCase):
         self.assertEqual(self.client.get('/api/v1/orders/00000000-0000-0000-0000-000000000000/').status_code, 404)
 
     def test_patch_status(self):
-        response = self.client.patch(self.url, {'status': 'preparing'}, format='json')
+        response = self.client.patch(self.url, {'status': 'done'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(reload(self.order).status, 'preparing')
+        self.assertEqual(reload(self.order).status, 'done')
 
     def test_patch_items_replaces_them_and_rescores(self):
         before = reload(self.order).priority_score
@@ -205,7 +205,7 @@ class DetailTests(OrdersAPITestCase):
                 self.assertEqual(response.status_code, 400)
 
     def test_batch_number_cannot_be_changed_through_the_api(self):
-        self.client.patch(self.url, {'status': 'preparing', 'batch_number': 42}, format='json')
+        self.client.patch(self.url, {'status': 'done', 'batch_number': 42}, format='json')
         self.assertEqual(reload(self.order).batch_number, 1)
 
     def test_delete_cancels_instead_of_deleting(self):

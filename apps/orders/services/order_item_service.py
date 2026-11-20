@@ -5,7 +5,7 @@ from apps.orders.services.order_service import _make_items, _assert_can_set_vip
 from apps.users.helpers.constants import UserRole
 
 
-EDITABLE_ORDER_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+EDITABLE_ORDER_STATUSES = (Order.Status.PENDING,)
 
 
 class OrderItemService:
@@ -14,7 +14,7 @@ class OrderItemService:
     @staticmethod
     def _assert_editable(order):
         if order.status not in EDITABLE_ORDER_STATUSES:
-            raise ValidationError(f'Cannot modify an order that is "{order.status}". Only pending or preparing orders can be modified.')
+            raise ValidationError(f'Cannot modify an order that is "{order.status}". Only pending orders can be modified.')
 
     @staticmethod
     def add_item(order, validated_data):

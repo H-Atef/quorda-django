@@ -6,7 +6,6 @@ import uuid
 class Order(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
-        PREPARING = 'preparing', 'Preparing'
         DONE = 'done', 'Done'
         CANCELLED = 'cancelled', 'Cancelled'
 

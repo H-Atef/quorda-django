@@ -40,8 +40,8 @@ class AssignBatchNumberTests(OrdersTestCase):
         make_order(self.restaurant, status='cancelled', batch_number=8)
         self.assertEqual(self.assign(), 1)  # kitchen is empty -> restart
 
-    def test_preparing_orders_count_as_active(self):
-        make_order(self.restaurant, status='preparing', batch_number=4)
+    def test_pending_orders_count_as_active(self):
+        make_order(self.restaurant, status='pending', batch_number=4)
         self.assertEqual(self.assign(window_size=3), 4)
 
     def test_restaurants_are_isolated(self):

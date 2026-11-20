@@ -5,7 +5,7 @@ from apps.orders.models import Order, OrderItem
 from apps.orders.services.order_service import _make_items
 
 
-EDITABLE_ORDER_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+EDITABLE_ORDER_STATUSES = (Order.Status.PENDING,)
 
 
 class CustomerOrderService:
@@ -53,7 +53,7 @@ class CustomerOrderService:
         if order.status not in EDITABLE_ORDER_STATUSES:
             raise ValidationError(
                 f'Cannot modify an order that is already "{order.status}". '
-                'Only pending or preparing orders can be modified.'
+                'Only pending orders can be modified.'
             )
         items_data = validated_data.pop('order_items', None)
         for attr, value in validated_data.items():

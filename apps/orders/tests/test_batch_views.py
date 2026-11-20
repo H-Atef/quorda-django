@@ -10,7 +10,7 @@ class BatchSummaryViewTests(OrdersAPITestCase):
 
     def test_reports_pending_and_holes(self):
         make_order(self.restaurant, batch_number=1)
-        make_order(self.restaurant, batch_number=1, status='preparing')
+        make_order(self.restaurant, batch_number=1, status='pending')
         make_order(self.restaurant, batch_number=2)
         make_order(self.restaurant, batch_number=2, status='done')  # not counted
         rows = self.client.get(SUMMARY, {'window_size': 3}).data['results']

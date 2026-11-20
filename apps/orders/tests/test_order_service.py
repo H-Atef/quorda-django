@@ -86,8 +86,8 @@ class UpdateOrderTests(OrdersTestCase):
         )
 
     def test_status_change(self):
-        OrderService.update_order(self.order, {'status': 'preparing'}, actor=self.owner)
-        self.assertEqual(reload(self.order).status, 'preparing')
+        OrderService.update_order(self.order, {'status': 'done'}, actor=self.owner)
+        self.assertEqual(reload(self.order).status, 'done')
 
     def test_replacing_items_recomputes_score(self):
         before = reload(self.order).priority_score
@@ -99,14 +99,14 @@ class UpdateOrderTests(OrdersTestCase):
         self.assertLess(after.priority_score, before)
 
     def test_omitting_items_keeps_them(self):
-        OrderService.update_order(self.order, {'status': 'preparing'}, actor=self.owner)
+        OrderService.update_order(self.order, {'status': 'done'}, actor=self.owner)
         self.assertEqual(reload(self.order).order_items.count(), 1)
 
     def test_protected_fields_are_ignored(self):
         batch = self.order.batch_number
         OrderService.update_order(
             self.order,
-            {'batch_number': 99, 'is_indoor': False, 'customer': create_customer(), 'status': 'preparing'},
+            {'batch_number': 99, 'is_indoor': False, 'customer': create_customer(), 'status': 'done'},
             actor=self.owner,
         )
         fresh = reload(self.order)
@@ -140,7 +140,7 @@ class UpdateOrderTests(OrdersTestCase):
 class CancelAndDeleteTests(OrdersTestCase):
 
     def test_cancel_active_orders(self):
-        for status in ('pending', 'preparing'):
+        for status in ('pending',):
             with self.subTest(status=status):
                 order = make_order(self.restaurant, [(self.fries, 1)], status=status)
                 OrderService.cancel_order(order)
@@ -189,10 +189,10 @@ class ListOrdersTests(OrdersTestCase):
 
     def test_defaults_to_active_orders_only(self):
         active = make_order(self.restaurant, status='pending', batch_number=1)
-        preparing = make_order(self.restaurant, status='preparing', batch_number=1)
+        active2 = make_order(self.restaurant, status='pending', batch_number=1)
         make_order(self.restaurant, status='done', batch_number=1)
         make_order(self.restaurant, status='cancelled', batch_number=1)
-        self.assertCountEqual(self.ids(), [active.pk, preparing.pk])
+        self.assertCountEqual(self.ids(), [active.pk, active2.pk])
 
     def test_explicit_statuses(self):
         done = make_order(self.restaurant, status='done', batch_number=1)
@@ -335,20 +335,20 @@ class SimpleOrdersTests(OrdersTestCase):
 
 class ClaimOrderTests(OrdersTestCase):
 
-    def test_claim_moves_pending_to_preparing(self):
+    def test_claim_returns_pending_order(self):
         order = make_order(self.restaurant, [(self.fries, 1)])
         claimed = OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        self.assertEqual(claimed.status, 'preparing')
-        self.assertEqual(reload(order).status, 'preparing')
+        self.assertEqual(claimed.status, 'pending')
+        self.assertEqual(reload(order).status, 'pending')
 
-    def test_second_claim_fails(self):
+    def test_second_claim_succeeds(self):
         order = make_order(self.restaurant, [(self.fries, 1)])
         OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        with self.assertRaises(ValidationError):
-            OrderService.claim_order(self.restaurant, order.pk, self.owner)
+        claimed = OrderService.claim_order(self.restaurant, order.pk, self.owner)
+        self.assertEqual(claimed.status, 'pending')
 
     def test_only_pending_orders_can_be_claimed(self):
-        for status in ('preparing', 'done', 'cancelled'):
+        for status in ('done', 'cancelled'):
             with self.subTest(status=status):
                 order = make_order(self.restaurant, status=status)
                 with self.assertRaises(ValidationError):

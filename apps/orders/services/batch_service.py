@@ -5,7 +5,7 @@ from apps.orders.models import Order
 from apps.users.models import RestaurantProfile
 
 
-ACTIVE_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+ACTIVE_STATUSES = (Order.Status.PENDING,)
 
 
 class BatchService:
@@ -36,7 +36,7 @@ class BatchService:
             }
 
         Guarantees:
-          - Only pending/preparing orders are considered (done/cancelled
+          - Only pending orders are considered (done/cancelled
             orders keep their original batch_number for audit).
           - Promotions are always oldest-first (by created_at).
           - Cascade stops when no more pending orders exist in later batches.
@@ -122,7 +122,7 @@ class BatchService:
 
               'all' (DANGEROUS)
                   Reset EVERY order to batch_number=0. Only allowed when
-                  there are NO pending/preparing orders. Forces a clean slate.
+                  there are NO pending orders. Forces a clean slate.
                   Use at start of a new day/shift.
 
         Returns:
@@ -142,12 +142,12 @@ class BatchService:
         if mode == 'all':
             active_count = Order.objects.filter(
                 restaurant=restaurant,
-                status__in=[Order.Status.PENDING, Order.Status.PREPARING],
+                status__in=[Order.Status.PENDING],
             ).count()
             if active_count > 0:
                 raise ValidationError({
                     'mode': (
-                        f'Cannot reset all batches: {active_count} pending/preparing '
+                        f'Cannot reset all batches: {active_count} pending '
                         f'orders exist. Complete or cancel them first, or use mode=completed.'
                     )
                 })

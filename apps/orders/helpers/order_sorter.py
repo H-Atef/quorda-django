@@ -14,7 +14,7 @@ from django.db.models import Max
 from apps.orders.models import Order
 
 
-ACTIVE_STATUSES = (Order.Status.PENDING, Order.Status.PREPARING)
+ACTIVE_STATUSES = (Order.Status.PENDING,)
 
 
 class OrderSorter:
