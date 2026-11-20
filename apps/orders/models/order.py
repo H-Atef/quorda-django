@@ -97,22 +97,22 @@ class Order(models.Model):
         return total
 
     def save(self, *args, **kwargs):
-        
         if not self.order_number:
-            # Get the last order for THIS restaurant
-            last_order = Order.objects.filter(
-                restaurant=self.restaurant
-            ).order_by('-id').first()
-            
-            if last_order:
-                # Extract number from "ORD-1001" -> 1001
-                last_num = int(last_order.order_number.split('-')[-1])
-                self.order_number = f"ORD-{last_num + 1}"
-            else:
-                # First order for this restaurant
-                self.order_number = "ORD-1001"
-                
+            self.order_number = self._next_order_number()
         super().save(*args, **kwargs)
+
+    def _next_order_number(self) -> str:
+        """Highest "ORD-<n>" already used by this restaurant, plus one."""
+        last_num = 1000
+        numbers = Order.objects.filter(
+            restaurant=self.restaurant,
+            order_number__startswith='ORD-',
+        ).values_list('order_number', flat=True)
+        for number in numbers:
+            suffix = number.rsplit('-', 1)[-1]
+            if suffix.isdigit():
+                last_num = max(last_num, int(suffix))
+        return f"ORD-{last_num + 1}"
 
     def recalculate_priority_score(self, items=None) -> None:
         from apps.orders.helpers.priority_calculator import PriorityCalculator
