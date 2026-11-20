@@ -44,7 +44,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'restaurant', 'customer', 'created_by', 'is_indoor', 'channel', 'status',
-            'special_flag', 'priority_score', 'shift', 'shift_name', 'order_items',
+            'special_flag', 'priority_score', 'batch_number', 'shift', 'shift_name', 'order_items',
             'total_quantity', 'total_prep_time', 'total_cost',
             'created_at', 'updated_at',
         ]

@@ -60,6 +60,13 @@ class Order(models.Model):
 
     priority_score = models.FloatField(default=0.0, editable=False)
 
+    batch_number = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Committed batch the order belongs to (starvation protection). NULL = not yet assigned to a batch. Once assigned it never changes.',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

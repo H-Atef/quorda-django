@@ -1,22 +1,49 @@
 from django.urls import path
-from apps.orders import views
+from apps.orders.views import (
+    OrderListCreateAPIView,
+    OrderDetailAPIView,
+    VIPOrdersAPIView,
+    WindowedOrdersAPIView,
+    IndoorNormalWindowedAPIView,
+    OutdoorNormalWindowedAPIView,
+    SimpleOrdersAPIView,
+    FilteredOrdersAPIView,
+    RebalanceBatchesAPIView,
+    BatchSummaryAPIView,
+    ResetBatchesAPIView,
+    CustomerOrderListCreateAPIView,
+    CustomerOrderDetailAPIView,
+    CustomerOrderCancelAPIView,
+    OrderItemListCreateAPIView,
+    OrderItemDetailAPIView,
+    ClaimOrderAPIView,
+)
 
 urlpatterns = [
     # ---- restaurant-owner routes ----
-    path('', views.OrderListCreateAPIView.as_view(), name='order-list-create'),
-    path('vip/', views.VIPOrdersAPIView.as_view(), name='order-vip'),
-    path('normal/windowed/', views.NormalOrdersWindowedAPIView.as_view(), name='order-normal-windowed'),
-    path('windowed/', views.WindowedOrdersAPIView.as_view(), name='order-windowed'),
-    path('by-creation-time/', views.OrdersByCreationTimeAPIView.as_view(), name='order-by-creation-time'),
-    path('simple/', views.SimpleOrdersAPIView.as_view(), name='order-simple'),
+    path('', OrderListCreateAPIView.as_view(), name='order-list-create'),
+    path('vip/', VIPOrdersAPIView.as_view(), name='order-vip'),
+    path('windowed/', WindowedOrdersAPIView.as_view(), name='order-windowed'),
+    path('indoor/normal/windowed/', IndoorNormalWindowedAPIView.as_view(), name='order-indoor-normal-windowed'),
+    path('outdoor/normal/windowed/', OutdoorNormalWindowedAPIView.as_view(), name='order-outdoor-normal-windowed'),
+    path('filtered/', FilteredOrdersAPIView.as_view(), name='order-filtered'),
+    path('simple/', SimpleOrdersAPIView.as_view(), name='order-simple'),
+
+    # ---- batch management ----
+    path('batch/rebalance/', RebalanceBatchesAPIView.as_view(), name='batch-rebalance'),
+    path('batch/reset/', ResetBatchesAPIView.as_view(), name='batch-reset'),
+    path('batch/summary/', BatchSummaryAPIView.as_view(), name='batch-summary'),
+
+    # ---- claim order ----
+    path('<uuid:pk>/claim/', ClaimOrderAPIView.as_view(), name='order-claim'),
 
     # ---- customer routes (delivery orders) ----
-    path('customers/', views.CustomerOrderListCreateAPIView.as_view(), name='customer-order-list-create'),
-    path('customers/<uuid:pk>/', views.CustomerOrderDetailAPIView.as_view(), name='customer-order-detail'),
-    path('customers/<uuid:pk>/cancel/', views.CustomerOrderCancelAPIView.as_view(), name='customer-order-cancel'),
+    path('customers/', CustomerOrderListCreateAPIView.as_view(), name='customer-order-list-create'),
+    path('customers/<uuid:pk>/', CustomerOrderDetailAPIView.as_view(), name='customer-order-detail'),
+    path('customers/<uuid:pk>/cancel/', CustomerOrderCancelAPIView.as_view(), name='customer-order-cancel'),
 
     # ---- restaurant-owner order detail / items ----
-    path('<uuid:pk>/', views.OrderDetailAPIView.as_view(), name='order-detail'),
-    path('<uuid:order_pk>/items/', views.OrderItemListCreateAPIView.as_view(), name='order-item-list-create'),
-    path('<uuid:order_pk>/items/<uuid:pk>/', views.OrderItemDetailAPIView.as_view(), name='order-item-detail'),
+    path('<uuid:pk>/', OrderDetailAPIView.as_view(), name='order-detail'),
+    path('<uuid:order_pk>/items/', OrderItemListCreateAPIView.as_view(), name='order-item-list-create'),
+    path('<uuid:order_pk>/items/<uuid:pk>/', OrderItemDetailAPIView.as_view(), name='order-item-detail'),
 ]
