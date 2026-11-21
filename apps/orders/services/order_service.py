@@ -110,7 +110,7 @@ class OrderService:
         order.save(update_fields=['batch_number'])
 
         _make_items(order, items_data)
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=order.order_items.select_related('menu_item__category'))
         return order
 
     @staticmethod
@@ -508,7 +508,7 @@ class CustomerOrderService:
         order.save(update_fields=['batch_number'])
 
         _make_items(order, items_data)
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=order.order_items.select_related('menu_item__category'))
         return order
 
     @staticmethod

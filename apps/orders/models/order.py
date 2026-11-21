@@ -71,19 +71,13 @@ class Order(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(
-                fields=['restaurant', 'status', 'batch_number', '-special_flag', '-priority_score', 'created_at'],
-                include=['id', 'customer_id', 'created_by_id', 'shift_id', 'is_indoor', 'created_at', 'updated_at'],
+                fields=['restaurant', 'status', 'batch_number'],
                 name='idx_kitchen_board'
             ),
             models.Index(
-                fields=['restaurant', 'batch_number', '-special_flag', '-priority_score', 'created_at'],
-                include=['id', 'customer_id', 'created_by_id', 'shift_id', 'is_indoor', 'created_at', 'updated_at'],
+                fields=['restaurant', 'batch_number'],
                 condition=models.Q(status='pending'),
                 name='idx_kitchen_board_pending'
-            ),
-            models.Index(
-                fields=['restaurant', 'status', 'special_flag', 'is_indoor', 'batch_number', '-priority_score', 'created_at'],
-                name='idx_indoor_normal_wdw'
             ),
         ]
 
