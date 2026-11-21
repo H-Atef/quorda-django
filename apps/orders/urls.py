@@ -3,7 +3,6 @@ from apps.orders.views import (
     OrderListCreateAPIView,
     OrderDetailAPIView,
     VIPOrdersAPIView,
-    WindowedOrdersAPIView,
     IndoorNormalWindowedAPIView,
     OutdoorNormalWindowedAPIView,
     SimpleOrdersAPIView,
@@ -23,7 +22,6 @@ urlpatterns = [
     # ---- restaurant-owner routes ----
     path('', OrderListCreateAPIView.as_view(), name='order-list-create'),
     path('vip/', VIPOrdersAPIView.as_view(), name='order-vip'),
-    path('windowed/', WindowedOrdersAPIView.as_view(), name='order-windowed'),
     path('indoor/normal/windowed/', IndoorNormalWindowedAPIView.as_view(), name='order-indoor-normal-windowed'),
     path('outdoor/normal/windowed/', OutdoorNormalWindowedAPIView.as_view(), name='order-outdoor-normal-windowed'),
     path('filtered/', FilteredOrdersAPIView.as_view(), name='order-filtered'),

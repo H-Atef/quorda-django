@@ -160,38 +160,6 @@ class VIPOrdersAPIView(APIView):
 
 
 @extend_schema(tags=['Orders'])
-class WindowedOrdersAPIView(APIView):
-    """Legacy endpoint - returns all active orders (VIP + normal) windowed by batch."""
-    permission_classes = [IsAuthenticated, IsRestaurantOwner]
-
-    @extend_schema(
-        parameters=[STATUS_PARAM, IS_INDOOR_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
-    )
-    def get(self, request):
-        restaurant = get_user_restaurant(request.user)
-        statuses = parse_statuses(request)
-        is_indoor = parse_is_indoor(request)
-        page = parse_page(request)
-        page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
-        ordering = parse_ordering(
-            request,
-            allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
-        )
-        orders = OrderService.list_orders(
-            restaurant,
-            vip_only=None,
-            statuses=statuses,
-            is_indoor=is_indoor,
-            windowed=True,
-            batch_limit=batch_limit,
-            ordering=ordering,
-        )
-        items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
-
-
-@extend_schema(tags=['Orders'])
 class IndoorNormalWindowedAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 

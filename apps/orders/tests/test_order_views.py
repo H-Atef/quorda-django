@@ -17,9 +17,9 @@ def body(menu_item, qty=1, **extra):
 
 class AccessControlTests(OrdersAPITestCase):
     ENDPOINTS = [
-        '/api/v1/orders/', '/api/v1/orders/vip/', '/api/v1/orders/windowed/',
+        '/api/v1/orders/', '/api/v1/orders/vip/', '/api/v1/orders/filtered/',
         '/api/v1/orders/indoor/normal/windowed/', '/api/v1/orders/outdoor/normal/windowed/',
-        '/api/v1/orders/filtered/', '/api/v1/orders/simple/', '/api/v1/orders/batch/summary/',
+        '/api/v1/orders/simple/', '/api/v1/orders/batch/summary/',
     ]
 
     def test_anonymous_gets_401(self):
@@ -244,19 +244,19 @@ class KitchenBoardTests(OrdersAPITestCase):
         return self.ids(response)
 
     def test_windowed_is_batch_then_vip_then_score(self):
-        self.assertEqual(self.get_ids('/api/v1/orders/windowed/'), [
+        self.assertEqual(self.get_ids('/api/v1/orders/filtered/'), [
             self.pk(self.vip), self.pk(self.high), self.pk(self.low),
             self.pk(self.next_batch), self.pk(self.delivery),
         ])
 
     def test_windowed_excludes_finished_orders_by_default(self):
-        self.assertNotIn(self.pk(self.done), self.get_ids('/api/v1/orders/windowed/'))
+        self.assertNotIn(self.pk(self.done), self.get_ids('/api/v1/orders/filtered/'))
 
     def test_windowed_filters(self):
-        self.assertEqual(self.get_ids('/api/v1/orders/windowed/', status='done'), [self.pk(self.done)])
-        self.assertEqual(self.get_ids('/api/v1/orders/windowed/', is_indoor='false'), [self.pk(self.delivery)])
+        self.assertEqual(self.get_ids('/api/v1/orders/filtered/', status='done'), [self.pk(self.done)])
+        self.assertEqual(self.get_ids('/api/v1/orders/filtered/', is_indoor='false'), [self.pk(self.delivery)])
         self.assertEqual(
-            self.get_ids('/api/v1/orders/windowed/', batch_limit=1),
+            self.get_ids('/api/v1/orders/filtered/', batch_limit=1),
             [self.pk(self.vip), self.pk(self.high), self.pk(self.low)],
         )
 
@@ -287,10 +287,10 @@ class KitchenBoardTests(OrdersAPITestCase):
 
     def test_invalid_query_parameters(self):
         cases = [
-            ('/api/v1/orders/windowed/', {'status': 'bogus'}),
-            ('/api/v1/orders/windowed/', {'is_indoor': 'maybe'}),
-            ('/api/v1/orders/windowed/', {'batch_limit': '0'}),
-            ('/api/v1/orders/windowed/', {'ordering': 'secret'}),
+            ('/api/v1/orders/filtered/', {'status': 'bogus'}),
+            ('/api/v1/orders/filtered/', {'is_indoor': 'maybe'}),
+            ('/api/v1/orders/filtered/', {'batch_limit': '0'}),
+            ('/api/v1/orders/filtered/', {'ordering': 'secret'}),
             ('/api/v1/orders/filtered/', {'scope': 'everything'}),
             ('/api/v1/orders/filtered/', {'windowed': 'sometimes'}),
             ('/api/v1/orders/filtered/', {'limit': '-3'}),
@@ -301,7 +301,7 @@ class KitchenBoardTests(OrdersAPITestCase):
 
     def test_other_restaurants_orders_never_leak(self):
         foreign = make_order(self.other_restaurant, special_flag=True, batch_number=1)
-        for url in ('/api/v1/orders/windowed/', '/api/v1/orders/vip/', '/api/v1/orders/filtered/'):
+        for url in ('/api/v1/orders/vip/', '/api/v1/orders/filtered/'):
             with self.subTest(url=url):
                 self.assertNotIn(self.pk(foreign), self.get_ids(url))
 

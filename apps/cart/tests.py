@@ -611,7 +611,7 @@ class CartIntegrationTests(CartTestMixin, APITestCase):
         self.client.post('/api/v1/cart/items/', {'menu_item': str(self.item.id), 'quantity': 1}, format='json')
         self.client.post('/api/v1/cart/checkout/', {}, format='json')
         self.authenticate(self.client, self.restaurant.user)
-        resp = self.client.get('/api/v1/orders/windowed/')
+        resp = self.client.get('/api/v1/orders/filtered/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data['results']), 1)
         self.assertIn('priority_score', resp.data['results'][0])
