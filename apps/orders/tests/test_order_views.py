@@ -289,7 +289,6 @@ class KitchenBoardTests(OrdersAPITestCase):
         cases = [
             ('/api/v1/orders/windowed/', {'status': 'bogus'}),
             ('/api/v1/orders/windowed/', {'is_indoor': 'maybe'}),
-            ('/api/v1/orders/windowed/', {'window_size': '0'}),
             ('/api/v1/orders/windowed/', {'batch_limit': '0'}),
             ('/api/v1/orders/windowed/', {'ordering': 'secret'}),
             ('/api/v1/orders/filtered/', {'scope': 'everything'}),

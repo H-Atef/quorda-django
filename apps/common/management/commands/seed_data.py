@@ -6,6 +6,8 @@ from apps.users.models import RestaurantProfile, CashierProfile
 from apps.restaurants.models import Category, MenuItem, ShiftDefinition
 from apps.cart.models import Cart, CartItem
 from apps.orders.models import Order, OrderItem
+from apps.orders.services.order_service import OrderService
+from apps.orders.services.customer_order_service import CustomerOrderService
 
 ADMIN_USERNAME = 'admin'
 ADMIN_EMAIL = 'admin@quorda.local'
@@ -271,31 +273,50 @@ class Command(BaseCommand):
             )
 
     def _create_orders(self, customers, restaurants):
-        statuses = ['pending', 'done', 'cancelled']
         for restaurant in restaurants:
             items = list(MenuItem.objects.filter(restaurant=restaurant))
             if not items:
                 continue
             for i in range(ORDERS_PER_RESTAURANT):
                 customer = customers[i % len(customers)]
-                status = statuses[i % len(statuses)]
-                order = Order.objects.create(
-                    restaurant=restaurant,
-                    customer=customer,
-                    created_by=customer,
-                    is_indoor=(i % 2 == 0),
-                    status=status,
-                )
+                is_indoor = (i % 2 == 0)
                 line_count = (i % 4) + 1
                 chosen = items[:line_count] if len(items) >= line_count else items
-                for menu_item in chosen:
-                    qty = (i % 3) + 1
-                    OrderItem.objects.create(
-                        order=order,
-                        menu_item=menu_item,
-                        quantity=qty,
-                        unit_price=menu_item.price,
+                order_items = [
+                    {'menu_item': menu_item, 'quantity': (i % 3) + 1}
+                    for menu_item in chosen
+                ]
+
+                if is_indoor:
+                    cashier = restaurant.cashiers.filter(is_active=True).first()
+                    actor = cashier.user if cashier else customer
+                    order = OrderService.create_order(
+                        restaurant=restaurant,
+                        validated_data={
+                            'order_items': order_items,
+                            'special_flag': False,
+                            'status': 'pending',
+                        },
+                        actor=actor,
+                        window_size=10,
                     )
+                    order.is_indoor = True
+                    order.customer = customer
+                    order.created_by = customer
+                    order.status = 'pending'
+                    order.save(update_fields=['is_indoor', 'customer', 'created_by', 'status'])
+                else:
+                    order = CustomerOrderService.create_order(
+                        customer=customer,
+                        restaurant=restaurant,
+                        validated_data={
+                            'order_items': order_items,
+                            'status': 'pending',
+                        },
+                    )
+                    order.status = 'pending'
+                    order.save(update_fields=['status'])
+
             self.stdout.write(
                 self.style.SUCCESS(f'Created {ORDERS_PER_RESTAURANT} orders for: {restaurant.restaurant_name}')
             )

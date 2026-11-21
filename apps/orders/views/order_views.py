@@ -8,21 +8,17 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
 from apps.orders.permissions import IsRestaurantOwner
-from apps.orders.serializers import OrderSerializer, OrderWriteSerializer
+from apps.orders.serializers import OrderSerializer, OrderListSerializer, OrderWriteSerializer
 from apps.orders.services.order_service import OrderService
 from apps.orders.views.query_params import (
     parse_bool, parse_is_indoor, parse_limit, parse_scope,
-    parse_statuses, parse_window_size, parse_page, parse_page_size,
+    parse_statuses, parse_page, parse_page_size,
     parse_batch_limit, parse_ordering,
 )
 from apps.common.pagination import paginate
 from apps.users.helpers.restaurant import get_user_restaurant
 
 
-WINDOW_SIZE_PARAM = OpenApiParameter(
-    name='window_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
-    required=False, default=10, description='Batch size target.',
-)
 SCOPE_PARAM = OpenApiParameter(
     name='scope', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY,
     required=False, enum=['all', 'vip', 'normal'],
@@ -69,7 +65,7 @@ class OrderListCreateAPIView(APIView):
     @extend_schema(
         summary='List orders',
         parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, ORDERING_PARAM],
-        responses=OrderSerializer(many=True),
+        responses=OrderListSerializer(many=True),
     )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
@@ -85,7 +81,7 @@ class OrderListCreateAPIView(APIView):
         else:
             qs = qs.order_by('-created_at')
         items, meta = paginate(qs, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
     @extend_schema(summary='Create an order', request=OrderWriteSerializer, responses={201: OrderSerializer})
     def post(self, request):
@@ -138,17 +134,16 @@ class OrderDetailAPIView(APIView):
 
 @extend_schema(tags=['Orders'])
 class VIPOrdersAPIView(APIView):
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
-        parameters=[WINDOW_SIZE_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
     )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
         page = parse_page(request)
         page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request)
+        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
         ordering = parse_ordering(
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
@@ -161,26 +156,24 @@ class VIPOrdersAPIView(APIView):
             ordering=ordering,
         )
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 @extend_schema(tags=['Orders'])
 class WindowedOrdersAPIView(APIView):
     """Legacy endpoint - returns all active orders (VIP + normal) windowed by batch."""
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
-        parameters=[WINDOW_SIZE_PARAM, STATUS_PARAM, IS_INDOOR_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
+        parameters=[STATUS_PARAM, IS_INDOOR_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
     )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
-        window_size = parse_window_size(request)
         statuses = parse_statuses(request)
         is_indoor = parse_is_indoor(request)
         page = parse_page(request)
         page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request)
+        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
         ordering = parse_ordering(
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
@@ -195,56 +188,53 @@ class WindowedOrdersAPIView(APIView):
             ordering=ordering,
         )
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 @extend_schema(tags=['Orders'])
 class IndoorNormalWindowedAPIView(APIView):
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
-        parameters=[WINDOW_SIZE_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
     )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
         page = parse_page(request)
         page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request)
+        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
         ordering = parse_ordering(
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
         orders = OrderService.get_indoor_normal_windowed(restaurant)
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 @extend_schema(tags=['Orders'])
 class OutdoorNormalWindowedAPIView(APIView):
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
-        parameters=[WINDOW_SIZE_PARAM, PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
+        parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
     )
     def get(self, request):
         restaurant = get_user_restaurant(request.user)
         page = parse_page(request)
         page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request)
+        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
         ordering = parse_ordering(
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
         orders = OrderService.get_outdoor_normal_windowed(restaurant)
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 @extend_schema(tags=['Orders'])
 class SimpleOrdersAPIView(APIView):
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
@@ -262,12 +252,11 @@ class SimpleOrdersAPIView(APIView):
         if ordering:
             orders = _apply_ordering(orders, ordering)
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 @extend_schema(tags=['Orders'])
 class FilteredOrdersAPIView(APIView):
-    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
 
     @extend_schema(
@@ -280,7 +269,7 @@ class FilteredOrdersAPIView(APIView):
         vip_only = {'all': None, 'vip': True, 'normal': False}[scope]
         page = parse_page(request)
         page_size = parse_page_size(request)
-        batch_limit = parse_batch_limit(request)
+        batch_limit = parse_batch_limit(request) or 5  # Default: first 5 batches only
         ordering = parse_ordering(
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
@@ -296,7 +285,7 @@ class FilteredOrdersAPIView(APIView):
             ordering=ordering,
         )
         items, meta = paginate(orders, page, page_size)
-        return Response({'results': OrderSerializer(items, many=True).data, **meta})
+        return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
 
 def _apply_ordering(orders, ordering):

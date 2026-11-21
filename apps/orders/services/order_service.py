@@ -54,6 +54,14 @@ class OrderService:
         )
 
     @staticmethod
+    def _list_qs(restaurant):
+        """Lightweight queryset for list views - no JOINs, prefetch items + categories."""
+        return (
+            Order.objects.filter(restaurant=restaurant)
+            .prefetch_related('order_items__menu_item__category')
+        )
+
+    @staticmethod
     def get_restaurant_orders_qs(restaurant):
         return OrderService._base_qs(restaurant)
 
@@ -209,7 +217,7 @@ class OrderService:
         batch_limit: restrict results to the first N batches (ordered by batch_number ASC).
         ordering: optional override ordering, e.g. '-created_at' or 'priority_score'.
         """
-        qs = OrderService._base_qs(restaurant)
+        qs = OrderService._list_qs(restaurant)
 
         if statuses is None:
             statuses = list(ACTIVE_STATUSES)
