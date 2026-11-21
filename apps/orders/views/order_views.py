@@ -148,7 +148,7 @@ class VIPOrdersAPIView(APIView):
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
-        orders = OrderService.list_orders(
+        orders = OrderService.list_orders_qs(
             restaurant,
             vip_only=True,
             windowed=True,
@@ -175,7 +175,7 @@ class IndoorNormalWindowedAPIView(APIView):
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
-        orders = OrderService.get_indoor_normal_windowed(restaurant)
+        orders = OrderService.get_indoor_normal_windowed_qs(restaurant)
         items, meta = paginate(orders, page, page_size)
         return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
@@ -196,7 +196,7 @@ class OutdoorNormalWindowedAPIView(APIView):
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
-        orders = OrderService.get_outdoor_normal_windowed(restaurant)
+        orders = OrderService.get_outdoor_normal_windowed_qs(restaurant)
         items, meta = paginate(orders, page, page_size)
         return Response({'results': OrderListSerializer(items, many=True).data, **meta})
 
@@ -216,7 +216,7 @@ class SimpleOrdersAPIView(APIView):
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
-        orders = OrderService.get_simple_orders(restaurant)
+        orders = OrderService.get_simple_orders_qs(restaurant)
         if ordering:
             orders = _apply_ordering(orders, ordering)
         items, meta = paginate(orders, page, page_size)
@@ -242,7 +242,7 @@ class FilteredOrdersAPIView(APIView):
             request,
             allowed={'batch_number', 'created_at', 'priority_score', 'special_flag', 'status', 'is_indoor'},
         )
-        orders = OrderService.list_orders(
+        orders = OrderService.list_orders_qs(
             restaurant,
             vip_only=vip_only,
             is_indoor=parse_is_indoor(request),
@@ -257,11 +257,11 @@ class FilteredOrdersAPIView(APIView):
 
 
 def _apply_ordering(orders, ordering):
-    """Apply ordering to a list of order instances using stable multi-pass sort."""
+    """Apply ordering to the simple-orders queryset in SQL.
+
+    Equivalent to the previous in-Python stable multi-pass sort over a list
+    that was already ordered by created_at: the requested fields win, and
+    created_at ASC breaks ties. Done in the DB so only one page is loaded.
+    """
     fields = [f.strip() for f in ordering.split(',') if f.strip()]
-    result = list(orders)
-    for field in reversed(fields):
-        desc = field.startswith('-')
-        name = field.lstrip('-')
-        result.sort(key=lambda o: getattr(o, name, None), reverse=desc)
-    return result
+    return orders.order_by(*fields, 'created_at')

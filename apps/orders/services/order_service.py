@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Prefetch, prefetch_related_objects
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
@@ -39,6 +39,25 @@ def _make_items(order, items_data):
     return OrderItem.objects.bulk_create(result)
 
 
+def _items_prefetch():
+    """Items + menu item + category in ONE query (JOINs) instead of three."""
+    return Prefetch(
+        'order_items',
+        queryset=OrderItem.objects.select_related('menu_item__category'),
+    )
+
+
+def _cache_items(order):
+    """
+    Load the order's items once and store them in the prefetch cache, so the
+    serializer's repeated `order.order_items.all()` calls (items, total_quantity,
+    total_prep_time, total_cost, per-item menu_item) cost no further queries.
+    Returns the cached items (usable as `items=` for the priority calculator).
+    """
+    prefetch_related_objects([order], _items_prefetch())
+    return order.order_items.all()
+
+
 class OrderService:
 
     # ================================================================
@@ -50,7 +69,7 @@ class OrderService:
         return (
             Order.objects.filter(restaurant=restaurant)
             .select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category')
+            .prefetch_related(_items_prefetch())
         )
 
     @staticmethod
@@ -58,7 +77,7 @@ class OrderService:
         """Lightweight queryset for list views - no JOINs, prefetch items + categories."""
         return (
             Order.objects.filter(restaurant=restaurant)
-            .prefetch_related('order_items__menu_item__category')
+            .prefetch_related(_items_prefetch())
         )
 
     @staticmethod
@@ -100,17 +119,19 @@ class OrderService:
         validated_data.pop('created_by', None)
         validated_data.pop('shift', None)
 
-        order = Order.objects.create(
+        order = Order(
             restaurant=restaurant,
             created_by=actor,
             is_indoor=True,
             **validated_data,
         )
+        # batch_number is assigned in memory, so one INSERT carries it
+        # (was INSERT + a separate UPDATE).
         OrderSorter.assign_batch_number(order, window_size=window_size)
-        order.save(update_fields=['batch_number'])
+        order.save(force_insert=True)
 
         _make_items(order, items_data)
-        order.recalculate_priority_score(items=order.order_items.select_related('menu_item__category'))
+        order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod
@@ -139,7 +160,7 @@ class OrderService:
         if items_data is not None:
             order.order_items.all().delete()
             _make_items(order, items_data)
-            order.recalculate_priority_score()
+            order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod
@@ -193,7 +214,12 @@ class OrderService:
     # ================================================================
 
     @staticmethod
-    def list_orders(
+    def list_orders(restaurant, **kwargs):
+        """Same as `list_orders_qs` but evaluated to a list (legacy callers / tests)."""
+        return list(OrderService.list_orders_qs(restaurant, **kwargs))
+
+    @staticmethod
+    def list_orders_qs(
         restaurant,
         *,
         vip_only=None,           # None = all; True = VIPs; False = non-VIP
@@ -205,7 +231,11 @@ class OrderService:
         ordering=None,           # Optional ordering override, e.g. '-created_at'
     ):
         """
-        Universal filter + sort.
+        Universal filter + sort, returned as a LAZY queryset.
+
+        Not evaluating here is the point: the views paginate, so only one page
+        of rows (and of prefetched items) is ever loaded instead of every
+        pending order for the restaurant.
 
         Windowed sort (default):
             batch_number ASC, VIPs first, then -priority_score, then created_at.
@@ -260,7 +290,7 @@ class OrderService:
             # Unwindowed: priority sort (NOT chronological — matches legacy behavior)
             qs = qs.order_by('-special_flag', '-priority_score', 'created_at')
 
-        return list(qs[:limit]) if limit else list(qs)
+        return qs[:limit] if limit else qs
 
     # ================================================================
     # Convenience wrappers
@@ -275,8 +305,16 @@ class OrderService:
         return OrderService.list_orders(restaurant, vip_only=False, is_indoor=True, windowed=True)
 
     @staticmethod
+    def get_indoor_normal_windowed_qs(restaurant):
+        return OrderService.list_orders_qs(restaurant, vip_only=False, is_indoor=True, windowed=True)
+
+    @staticmethod
     def get_outdoor_normal_windowed(restaurant):
         return OrderService.list_orders(restaurant, vip_only=False, is_indoor=False, windowed=True)
+
+    @staticmethod
+    def get_outdoor_normal_windowed_qs(restaurant):
+        return OrderService.list_orders_qs(restaurant, vip_only=False, is_indoor=False, windowed=True)
 
     @staticmethod
     def get_windowed_orders(restaurant, window_size=None, statuses=None, is_indoor=None):
@@ -295,14 +333,21 @@ class OrderService:
     @staticmethod
     def get_simple_orders(restaurant):
         """Simple orders: active, non-VIP, passing SimpleOrderDetector."""
+        return list(OrderService.get_simple_orders_qs(restaurant))
+
+    @staticmethod
+    def get_simple_orders_qs(restaurant):
+        """Lazy version of `get_simple_orders` (empty queryset when no criteria)."""
         criteria = CriteriaService.get_or_none(restaurant)
         if criteria is None:
-            return []
+            return Order.objects.none()
+        # _list_qs: the list serializer never reads created_by / shift, so the
+        # two extra JOINs (and their GROUP BY columns) are dropped.
         qs = (
-            OrderService._base_qs(restaurant)
+            OrderService._list_qs(restaurant)
             .filter(status__in=ACTIVE_STATUSES, special_flag=False)
         )
-        return list(SimpleOrderDetector.detect(qs, criteria).order_by('created_at'))
+        return SimpleOrderDetector.detect(qs, criteria).order_by('created_at')
 
     # ================================================================
     # Rebalance — fill holes by promoting oldest from later batches
@@ -497,7 +542,7 @@ class CustomerOrderService:
             raise ValidationError({'restaurant': 'Cannot order from an inactive restaurant.'})
         items_data = validated_data.pop('order_items')
 
-        order = Order.objects.create(
+        order = Order(
             restaurant=restaurant,
             customer=customer,
             created_by=customer,
@@ -505,10 +550,10 @@ class CustomerOrderService:
             **validated_data,
         )
         OrderSorter.assign_batch_number(order, window_size=window_size)
-        order.save(update_fields=['batch_number'])
+        order.save(force_insert=True)
 
         _make_items(order, items_data)
-        order.recalculate_priority_score(items=order.order_items.select_related('menu_item__category'))
+        order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod
