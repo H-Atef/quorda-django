@@ -89,19 +89,20 @@ class OrderService:
         return get_object_or_404(
             Order.objects
             .select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category'),
+            .prefetch_related(_items_prefetch()),
             pk=order_pk,
             restaurant=restaurant,
         )
 
     @staticmethod
     def get_owned_item(restaurant, order_pk, item_pk):
-        order = OrderService.get_owned_order(restaurant, order_pk)
         item = get_object_or_404(
-            order.order_items.select_related('menu_item__category'),
+            OrderItem.objects.select_related('menu_item__category', 'order'),
             pk=item_pk,
+            order__restaurant=restaurant,
+            order_id=order_pk,
         )
-        return order, item
+        return item.order, item
 
     # ================================================================
     # CRUD — atomic, batch-aware
@@ -186,7 +187,7 @@ class OrderService:
             quantity=validated_data['quantity'],
             unit_price=menu_item.price if menu_item is not None else None,
         )
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=_cache_items(order))
         return item
 
     @staticmethod
@@ -199,7 +200,7 @@ class OrderService:
         if 'quantity' in validated_data:
             item.quantity = validated_data['quantity']
         item.save()
-        item.order.recalculate_priority_score()
+        item.order.recalculate_priority_score(items=_cache_items(item.order))
         return item
 
     @staticmethod
@@ -207,7 +208,7 @@ class OrderService:
         OrderService._assert_editable(item.order)
         order = item.order
         item.delete()
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=_cache_items(order))
 
     # ================================================================
     # Universal list endpoint — the primary read method
@@ -521,7 +522,7 @@ class CustomerOrderService:
         return (
             Order.objects.filter(customer=customer, is_indoor=False)
             .select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category')
+            .prefetch_related(_items_prefetch())
         )
 
     @staticmethod
@@ -529,7 +530,7 @@ class CustomerOrderService:
         return get_object_or_404(
             Order.objects
             .select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category'),
+            .prefetch_related(_items_prefetch()),
             pk=order_pk,
             customer=customer,
             is_indoor=False,
@@ -570,7 +571,7 @@ class CustomerOrderService:
         if items_data is not None:
             order.order_items.all().delete()
             _make_items(order, items_data)
-            order.recalculate_priority_score()
+            order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod

@@ -2,7 +2,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.orders.helpers.order_sorter import OrderSorter
 from apps.orders.models import Order, OrderItem
-from apps.orders.services.order_service import _make_items
+from apps.orders.services.order_service import _cache_items, _items_prefetch, _make_items
 
 
 EDITABLE_ORDER_STATUSES = (Order.Status.PENDING,)
@@ -16,7 +16,7 @@ class CustomerOrderService:
         return (
             Order.objects.filter(customer=customer, is_indoor=False)
             .select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category')
+            .prefetch_related(_items_prefetch())
         )
 
     @staticmethod
@@ -24,7 +24,7 @@ class CustomerOrderService:
         from django.shortcuts import get_object_or_404
         return get_object_or_404(
             Order.objects.select_related('created_by', 'shift')
-            .prefetch_related('order_items__menu_item__category'),
+            .prefetch_related(_items_prefetch()),
             pk=order_pk,
             customer=customer,
             is_indoor=False,
@@ -45,7 +45,7 @@ class CustomerOrderService:
         OrderSorter.assign_batch_number(order, window_size=10)
         order.save(update_fields=['batch_number'])
         _make_items(order, items_data)
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod
@@ -62,7 +62,7 @@ class CustomerOrderService:
         if items_data is not None:
             order.order_items.all().delete()
             _make_items(order, items_data)
-            order.recalculate_priority_score()
+            order.recalculate_priority_score(items=_cache_items(order))
         return order
 
     @staticmethod

@@ -1,7 +1,7 @@
 from rest_framework.exceptions import ValidationError
 
 from apps.orders.models import Order, OrderItem
-from apps.orders.services.order_service import _make_items, _assert_can_set_vip
+from apps.orders.services.order_service import _cache_items, _make_items, _assert_can_set_vip
 from apps.users.helpers.constants import UserRole
 
 
@@ -26,7 +26,7 @@ class OrderItemService:
             quantity=validated_data['quantity'],
             unit_price=menu_item.price if menu_item is not None else None,
         )
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=_cache_items(order))
         return item
 
     @staticmethod
@@ -39,7 +39,7 @@ class OrderItemService:
         if 'quantity' in validated_data:
             item.quantity = validated_data['quantity']
         item.save()
-        item.order.recalculate_priority_score()
+        item.order.recalculate_priority_score(items=_cache_items(item.order))
         return item
 
     @staticmethod
@@ -47,4 +47,4 @@ class OrderItemService:
         OrderItemService._assert_editable(item.order)
         order = item.order
         item.delete()
-        order.recalculate_priority_score()
+        order.recalculate_priority_score(items=_cache_items(order))
