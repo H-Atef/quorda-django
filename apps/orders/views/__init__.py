@@ -23,7 +23,6 @@ from apps.orders.views.customer_views import (
 from apps.orders.views.item_views import (
     OrderItemListCreateAPIView,
     OrderItemDetailAPIView,
-    ClaimOrderAPIView,
 )
 
 __all__ = [
@@ -46,5 +45,4 @@ __all__ = [
     # Item views
     'OrderItemListCreateAPIView',
     'OrderItemDetailAPIView',
-    'ClaimOrderAPIView',
 ]

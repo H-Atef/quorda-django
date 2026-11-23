@@ -1,4 +1,4 @@
-"""Order-item endpoints and the claim action."""
+"""Order-item endpoints."""
 
 from apps.orders.tests.base import (
     OrdersAPITestCase, create_cashier, create_customer, make_order, reload,
@@ -117,38 +117,3 @@ class ItemDetailTests(ItemViewsBase):
             with self.subTest(method=method):
                 self.assertEqual(getattr(self.client, method)(url, format='json').status_code, 404)
         self.assertEqual(foreign.order_items.count(), 1)
-
-
-class ClaimViewTests(OrdersAPITestCase):
-
-    def url(self, order):
-        return f'/api/v1/orders/{order.pk}/claim/'
-
-    def test_claim_pending_order(self):
-        order = make_order(self.restaurant, [(self.fries, 1)])
-        response = self.client.post(self.url(order))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['status'], 'pending')
-
-    def test_double_claim_is_allowed(self):
-        order = make_order(self.restaurant, [(self.fries, 1)])
-        self.client.post(self.url(order))
-        self.assertEqual(self.client.post(self.url(order)).status_code, 200)
-
-    def test_claim_requires_pending(self):
-        for status in ('done', 'cancelled'):
-            with self.subTest(status=status):
-                self.assertEqual(self.client.post(self.url(make_order(self.restaurant, status=status))).status_code, 400)
-
-    def test_cannot_claim_other_restaurants_order(self):
-        order = make_order(self.other_restaurant)
-        self.assertEqual(self.client.post(self.url(order)).status_code, 400)
-        self.assertEqual(reload(order).status, 'pending')
-
-    def test_cashier_can_claim(self):
-        order = make_order(self.restaurant)
-        self.assertEqual(self.as_user(create_cashier(self.restaurant)).post(self.url(order)).status_code, 200)
-
-    def test_customer_cannot_claim(self):
-        order = make_order(self.restaurant)
-        self.assertEqual(self.as_user(create_customer()).post(self.url(order)).status_code, 403)

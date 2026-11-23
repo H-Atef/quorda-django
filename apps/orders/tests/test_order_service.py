@@ -1,4 +1,4 @@
-"""OrderService: create / update / cancel, listing & sorting, simple orders, claim."""
+"""OrderService: create / update / cancel, listing & sorting, simple orders."""
 from decimal import Decimal
 
 from django.db import connection
@@ -331,31 +331,3 @@ class SimpleOrdersTests(OrdersTestCase):
         Criteria.objects.create(restaurant=self.other_restaurant, max_quantity=9, min_category_priority=1)
         make_order(self.other_restaurant, [(self.other_menu['fries'], 1)])
         self.assertEqual(self.simple_ids(), [])
-
-
-class ClaimOrderTests(OrdersTestCase):
-
-    def test_claim_returns_pending_order(self):
-        order = make_order(self.restaurant, [(self.fries, 1)])
-        claimed = OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        self.assertEqual(claimed.status, 'pending')
-        self.assertEqual(reload(order).status, 'pending')
-
-    def test_second_claim_succeeds(self):
-        order = make_order(self.restaurant, [(self.fries, 1)])
-        OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        claimed = OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        self.assertEqual(claimed.status, 'pending')
-
-    def test_only_pending_orders_can_be_claimed(self):
-        for status in ('done', 'cancelled'):
-            with self.subTest(status=status):
-                order = make_order(self.restaurant, status=status)
-                with self.assertRaises(ValidationError):
-                    OrderService.claim_order(self.restaurant, order.pk, self.owner)
-
-    def test_cannot_claim_another_restaurants_order(self):
-        order = make_order(self.other_restaurant)
-        with self.assertRaises(ValidationError):
-            OrderService.claim_order(self.restaurant, order.pk, self.owner)
-        self.assertEqual(reload(order).status, 'pending')

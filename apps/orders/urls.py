@@ -15,7 +15,6 @@ from apps.orders.views import (
     CustomerOrderCancelAPIView,
     OrderItemListCreateAPIView,
     OrderItemDetailAPIView,
-    ClaimOrderAPIView,
 )
 
 urlpatterns = [
@@ -31,9 +30,6 @@ urlpatterns = [
     path('batch/rebalance/', RebalanceBatchesAPIView.as_view(), name='batch-rebalance'),
     path('batch/reset/', ResetBatchesAPIView.as_view(), name='batch-reset'),
     path('batch/summary/', BatchSummaryAPIView.as_view(), name='batch-summary'),
-
-    # ---- claim order ----
-    path('<uuid:pk>/claim/', ClaimOrderAPIView.as_view(), name='order-claim'),
 
     # ---- customer routes (delivery orders) ----
     path('customers/', CustomerOrderListCreateAPIView.as_view(), name='customer-order-list-create'),

@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from drf_spectacular.utils import extend_schema
 
 from apps.orders.permissions import IsRestaurantOwner, IsOrderItemOwner
-from apps.orders.serializers import OrderItemReadSerializer, OrderItemWriteSerializer, OrderSerializer
+from apps.orders.serializers import OrderItemReadSerializer, OrderItemWriteSerializer
 from apps.orders.services.order_service import OrderService
 from apps.orders.services.order_item_service import OrderItemService
 from apps.users.helpers.restaurant import get_user_restaurant
@@ -68,17 +68,3 @@ class OrderItemDetailAPIView(APIView):
         _, item = OrderService.get_owned_item(restaurant, order_pk, pk)
         OrderItemService.delete_item(item, actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@extend_schema(tags=['Orders'])
-class ClaimOrderAPIView(APIView):
-    serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, IsRestaurantOwner]
-
-    @extend_schema(summary='Atomically claim a pending order for cooking')
-    def post(self, request, pk):
-        from apps.users.helpers.restaurant import get_user_restaurant
-        restaurant = get_user_restaurant(request.user)
-        order = OrderService.claim_order(restaurant, pk, request.user)
-        from apps.orders.serializers import OrderSerializer
-        return Response(OrderSerializer(order).data)

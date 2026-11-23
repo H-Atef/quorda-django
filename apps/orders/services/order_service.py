@@ -486,30 +486,6 @@ class OrderService:
         }
 
     # ================================================================
-    # Claim — for staff starting to cook (atomic)
-    # ================================================================
-
-    @staticmethod
-    @transaction.atomic
-    def claim_order(restaurant, order_id, worker):
-        """
-        Claim a pending order for cooking. Race-safe via
-        select_for_update(skip_locked=True). Scoped to restaurant.
-        """
-        order = (
-            Order.objects
-            .select_for_update(skip_locked=True)
-            .filter(
-                pk=order_id,
-                restaurant=restaurant,
-                status=Order.Status.PENDING,
-            )
-            .first()
-        )
-        if order is None:
-            raise ValidationError({'order': 'Already claimed or not pending.'})
-        return order
-
 
 # ============================================================
 # Customer-facing (delivery) service

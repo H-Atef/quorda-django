@@ -136,7 +136,7 @@ class PublicRestaurantsService:
     @staticmethod
     @ServiceErrorHandler.handle_all_exceptions()
     def list_active_restaurants():
-        return RestaurantProfile.objects.filter(is_active=True)
+        return RestaurantProfile.objects.filter(is_active=True).order_by('restaurant_name')
 
     @staticmethod
     @ServiceErrorHandler.handle_all_exceptions()
@@ -159,7 +159,7 @@ class ShiftDefinitionService:
     @staticmethod
     @ServiceErrorHandler.handle_all_exceptions()
     def list_for_restaurant(restaurant_profile):
-        return ShiftDefinition.objects.filter(restaurant=restaurant_profile)
+        return ShiftDefinition.objects.filter(restaurant=restaurant_profile).order_by('-created_at')
 
     @staticmethod
     @ServiceErrorHandler.handle_all_exceptions()
