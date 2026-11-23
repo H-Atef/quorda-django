@@ -54,7 +54,7 @@ class RebalanceViewTests(OrdersAPITestCase):
         make_order(self.restaurant, batch_number=2)
         make_order(self.restaurant, batch_number=3)
         response = self.client.post(f'{REBALANCE}?window_size=2&batch=2')
-        self.assertEqual({c['new_batch'] for c in response.data['changes']}, {2})
+        self.assertEqual(response.data['rebalanced'], 1)
 
     def test_validation(self):
         for query in ('window_size=0', 'batch=0', 'batch=abc'):

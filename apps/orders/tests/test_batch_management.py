@@ -27,8 +27,6 @@ class RebalanceTests(OrdersTestCase):
                 result = svc.rebalance_batches(self.restaurant, window_size=2)
                 self.assertEqual(batches(a, old, new), [1, 1, 2])
                 self.assertEqual(result['rebalanced'], 1)
-                self.assertEqual(result['changes'][0],
-                                 {'order_id': str(old.pk), 'old_batch': 2, 'new_batch': 1})
                 # reset for the next implementation
                 from apps.orders.models import Order
                 Order.objects.filter(pk=old.pk).update(batch_number=2)
@@ -70,7 +68,7 @@ class RebalanceTests(OrdersTestCase):
         for svc in IMPLEMENTATIONS:
             with self.subTest(service=svc.__name__):
                 result = svc.rebalance_batches(self.restaurant, window_size=2, target_batch=2)
-                self.assertEqual({c['new_batch'] for c in result['changes']}, {2})
+                self.assertEqual(result['rebalanced'], 1)
                 from apps.orders.models import Order
                 Order.objects.filter(pk=later.pk).update(batch_number=3)
 
@@ -83,7 +81,7 @@ class RebalanceTests(OrdersTestCase):
     def test_nothing_to_do_on_empty_kitchen(self):
         for svc in IMPLEMENTATIONS:
             result = svc.rebalance_batches(self.restaurant)
-            self.assertEqual((result['rebalanced'], result['changes']), (0, []))
+            self.assertEqual(result['rebalanced'], 0)
 
 
 class ResetTests(OrdersTestCase):

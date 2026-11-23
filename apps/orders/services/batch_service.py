@@ -27,10 +27,6 @@ class BatchService:
         Returns:
             {
                 'rebalanced': <count>,
-                'changes': [
-                    {'order_id': ..., 'old_batch': N, 'new_batch': M},
-                    ...
-                ],
                 'summary_before': [...],
                 'summary_after': [...],
             }
@@ -45,7 +41,7 @@ class BatchService:
         RestaurantProfile.objects.select_for_update().get(pk=restaurant.pk)
 
         summary_before = cls._batch_summary(restaurant, ACTIVE_STATUSES)
-        changes = []
+        rebalanced = 0
 
         # Which batches do we touch?
         if target_batch is not None:
@@ -90,18 +86,11 @@ class BatchService:
             Order.objects.filter(pk__in=old_batch_by_order.keys()).update(
                 batch_number=batch_num,
             )
-
-            for o in promote:
-                changes.append({
-                    'order_id': str(o.id),
-                    'old_batch': old_batch_by_order[o.id],
-                    'new_batch': batch_num,
-                })
+            rebalanced += len(promote)
 
         summary_after = cls._batch_summary(restaurant, ACTIVE_STATUSES)
         return {
-            'rebalanced': len(changes),
-            'changes': changes,
+            'rebalanced': rebalanced,
             'summary_before': summary_before,
             'summary_after': summary_after,
         }

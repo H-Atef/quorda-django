@@ -54,6 +54,11 @@ def _cache_items(order):
     total_prep_time, total_cost, per-item menu_item) cost no further queries.
     Returns the cached items (usable as `items=` for the priority calculator).
     """
+    # Invalidate any stale prefetch cache (e.g. from get_owned_order) so
+    # newly created/modified items are included in the re-fetch.
+    cache = getattr(order, '_prefetched_objects_cache', None)
+    if cache is not None:
+        cache.pop('order_items', None)
     prefetch_related_objects([order], _items_prefetch())
     return order.order_items.all()
 
@@ -365,60 +370,54 @@ class OrderService:
         always oldest-first (by created_at).
 
         Returns:
-            {'rebalanced': N, 'changes': [...], 'summary_before': [...], 'summary_after': [...]}
+            {'rebalanced': N, 'summary_before': [...], 'summary_after': [...]}
         """
         RestaurantProfile.objects.select_for_update().get(pk=restaurant.pk)
 
         summary_before = cls._batch_summary(restaurant)
-        changes = []
+        rebalanced = 0
 
         if target_batch is not None:
             batches = [target_batch]
         else:
-            batches = list(
-                Order.objects
-                .filter(restaurant=restaurant, status__in=ACTIVE_STATUSES)
-                .values_list('batch_number', flat=True)
-                .distinct()
-                .order_by('batch_number')
-            )
+            batches = [row['batch_number'] for row in summary_before]
+
+        # Fetch all active orders once and group by batch in memory, so the
+        # per-batch loop below does not hit the DB once per batch (N+1).
+        orders_by_batch = {}
+        for o in Order.objects.filter(
+            restaurant=restaurant, status__in=ACTIVE_STATUSES,
+        ).order_by('batch_number', 'created_at'):
+            orders_by_batch.setdefault(o.batch_number, []).append(o)
 
         for batch_num in batches:
-            pending_here = Order.objects.filter(
-                restaurant=restaurant,
-                batch_number=batch_num,
-                status__in=ACTIVE_STATUSES,
-            ).count()
-
+            pending_here = len(orders_by_batch.get(batch_num, []))
             holes = window_size - pending_here
             if holes <= 0:
                 continue
 
-            promote = list(
-                Order.objects
-                .filter(
-                    restaurant=restaurant,
-                    batch_number__gt=batch_num,
-                    status__in=ACTIVE_STATUSES,
-                )
-                .order_by('batch_number', 'created_at')[:holes]
-            )
+            promote = []
+            for later_batch in sorted(b for b in orders_by_batch if b > batch_num):
+                for o in orders_by_batch[later_batch]:
+                    promote.append(o)
+                    if len(promote) >= holes:
+                        break
+                if len(promote) >= holes:
+                    break
+
             if not promote:
                 continue
 
-            old_batches = {o.pk: o.batch_number for o in promote}
-            Order.objects.filter(pk__in=old_batches.keys()).update(batch_number=batch_num)
+            Order.objects.filter(pk__in=[o.pk for o in promote]).update(batch_number=batch_num)
+            rebalanced += len(promote)
 
+            # Update in-memory tracking so the cascade works for later batches
             for o in promote:
-                changes.append({
-                    'order_id': str(o.pk),
-                    'old_batch': old_batches[o.pk],
-                    'new_batch': batch_num,
-                })
+                orders_by_batch[o.batch_number].remove(o)
+                orders_by_batch.setdefault(batch_num, []).append(o)
 
         return {
-            'rebalanced': len(changes),
-            'changes': changes,
+            'rebalanced': rebalanced,
             'summary_before': summary_before,
             'summary_after': cls._batch_summary(restaurant),
         }
