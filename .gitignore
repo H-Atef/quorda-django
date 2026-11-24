@@ -123,3 +123,4 @@ perf.py
 perf
 /tmp
 *kilo*
+requirements.local.txt
