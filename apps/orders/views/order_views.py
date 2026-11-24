@@ -135,6 +135,7 @@ class OrderDetailAPIView(APIView):
 @extend_schema(tags=['Orders'])
 class VIPOrdersAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
+    serializer_class = OrderListSerializer
 
     @extend_schema(
         parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
@@ -162,6 +163,7 @@ class VIPOrdersAPIView(APIView):
 @extend_schema(tags=['Orders'])
 class IndoorNormalWindowedAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
+    serializer_class = OrderListSerializer
 
     @extend_schema(
         parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
@@ -183,6 +185,7 @@ class IndoorNormalWindowedAPIView(APIView):
 @extend_schema(tags=['Orders'])
 class OutdoorNormalWindowedAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
+    serializer_class = OrderListSerializer
 
     @extend_schema(
         parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, BATCH_LIMIT_PARAM, ORDERING_PARAM],
@@ -204,6 +207,7 @@ class OutdoorNormalWindowedAPIView(APIView):
 @extend_schema(tags=['Orders'])
 class SimpleOrdersAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
+    serializer_class = OrderListSerializer
 
     @extend_schema(
         parameters=[PAGE_PARAM, PAGE_SIZE_PARAM, ORDERING_PARAM],
@@ -226,6 +230,7 @@ class SimpleOrdersAPIView(APIView):
 @extend_schema(tags=['Orders'])
 class FilteredOrdersAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRestaurantOwner]
+    serializer_class = OrderListSerializer
 
     @extend_schema(
         summary='Filter/sort orders by any combination',
