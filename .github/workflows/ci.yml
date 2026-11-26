@@ -28,6 +28,9 @@ jobs:
       - name: Fail if model changes are missing a migration
         run: python manage.py makemigrations --check --dry-run --settings=config.settings.test
 
+      - name: Apply migrations
+        run: python manage.py migrate --settings=config.settings.test
+
       - name: Unit and API tests
         run: python manage.py test --settings=config.settings.test
 
