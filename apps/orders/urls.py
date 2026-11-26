@@ -15,6 +15,7 @@ from apps.orders.views import (
     CustomerOrderCancelAPIView,
     OrderItemListCreateAPIView,
     OrderItemDetailAPIView,
+    GroupedItemsAPIView,
 )
 
 urlpatterns = [
@@ -25,6 +26,7 @@ urlpatterns = [
     path('outdoor/normal/windowed/', OutdoorNormalWindowedAPIView.as_view(), name='order-outdoor-normal-windowed'),
     path('filtered/', FilteredOrdersAPIView.as_view(), name='order-filtered'),
     path('simple/', SimpleOrdersAPIView.as_view(), name='order-simple'),
+    path('items/grouped/', GroupedItemsAPIView.as_view(), name='order-items-grouped'),
 
     # ---- batch management ----
     path('batch/rebalance/', RebalanceBatchesAPIView.as_view(), name='batch-rebalance'),

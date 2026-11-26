@@ -135,3 +135,29 @@ class CustomerOrderUpdateSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError('An order must contain at least one item.')
         return value
+
+
+class GroupedOrderLineSerializer(serializers.Serializer):
+    """One order's need for an item, inside a grouped-items response."""
+    order_id = serializers.UUIDField()
+    order_number = serializers.CharField()
+    queue_position = serializers.IntegerField(help_text='1-based position in the kitchen queue.')
+    batch_number = serializers.IntegerField(allow_null=True)
+    special_flag = serializers.BooleanField(help_text='VIP order.')
+    channel = serializers.CharField()
+    quantity = serializers.IntegerField()
+
+
+class ItemGroupSerializer(serializers.Serializer):
+    """A menu item with every queued order that needs it (see ItemGroupingService)."""
+    menu_item = serializers.UUIDField(source='menu_item_id', allow_null=True)
+    name = serializers.CharField()
+    category = serializers.CharField(allow_null=True)
+    prep_time = serializers.IntegerField(allow_null=True, help_text='Minutes per unit.')
+    total_quantity = serializers.IntegerField()
+    order_count = serializers.IntegerField()
+    first_queue_position = serializers.IntegerField()
+    spans_batches = serializers.BooleanField(
+        help_text='True when orders from more than one batch need this item.',
+    )
+    orders = GroupedOrderLineSerializer(source='lines', many=True)

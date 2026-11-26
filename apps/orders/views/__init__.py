@@ -25,6 +25,8 @@ from apps.orders.views.item_views import (
     OrderItemDetailAPIView,
 )
 
+from apps.orders.views.grouped_item_views import GroupedItemsAPIView
+
 __all__ = [
     # Order views
     'OrderListCreateAPIView',
@@ -45,4 +47,6 @@ __all__ = [
     # Item views
     'OrderItemListCreateAPIView',
     'OrderItemDetailAPIView',
+    # Grouped items (prep list)
+    'GroupedItemsAPIView',
 ]
