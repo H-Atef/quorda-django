@@ -1,6 +1,6 @@
 # Quorda Food Ordering System (Backend)
 
-Quorda is a priority-driven food ordering and kitchen queue management backend system built with Django and Django REST Framework. The system replaces conventional First-In, First-Out (FIFO) ticket queues and manual visual sorting with a multi-factor priority algorithm designed to streamline food preparation workflows for small to medium kitchens.
+Quorda is a priority-driven food ordering and kitchen queue management backend system built with Django and Django REST Framework. A multi-factor priority algorithm organizes kitchen tickets and streamlines food preparation workflows for small to medium kitchens.
 
 ---
 
@@ -27,7 +27,8 @@ Quorda is a priority-driven food ordering and kitchen queue management backend s
     - [3.2.1 Scaling and Latency Results](#321-scaling-and-latency-results)
     - [3.2.2 Pure Algorithm Computational Cost](#322-pure-algorithm-computational-cost)
   - [3.3 Concurrent Load Testing (Locust)](#33-concurrent-load-testing-locust)
-  - [3.4 Production Feasibility and MVP Conclusion](#34-production-feasibility-and-mvp-conclusion)
+  - [3.4 Benchmark on PostgreSQL 16](#34-benchmark-on-postgresql-16)
+  - [3.5 Production Feasibility and MVP Conclusion](#36-production-feasibility-and-mvp-conclusion)
 - [4. Table of Endpoints and Functionalities](#4-table-of-endpoints-and-functionalities)
   - [4.1 Authentication and Account Management](#41-authentication-and-account-management)
   - [4.2 Restaurant Profiles and Staff Operations](#42-restaurant-profiles-and-staff-operations)
@@ -57,7 +58,7 @@ Quorda is a priority-driven food ordering and kitchen queue management backend s
 Quorda addresses these challenges by introducing a deterministic, algorithmic priority framework that balances operational efficiency with fairness:
 
 - **Algorithmic Prioritization:** Orders are assigned an automated priority score based on preparation duration, item quantities, and meal category significance.
-- **Fairness Over Naive Greediness:** The algorithm serves as an equitable middle ground between strict FIFO and unconstrained priority scheduling.
+- **Fairness with priority:** Batch windowing keeps earlier tickets ahead of later batches, while priority scoring orders tickets inside a batch. A higher score does not move an order into an older batch.
 - **Target Audience:** The system is tailored as an MVP (Minimum Viable Product) for small to medium-sized kitchens, food trucks, and independent diners experiencing peak-hour congestion.
 
 ### 1.3 System Architecture and UI Workspaces
@@ -270,12 +271,16 @@ End-to-end load tests (`perf/locustfile.py`) simulated realistic multi-persona t
 
 Both test runs maintained a 0% failure rate under sustained load. Elevated p95/max latencies were primarily driven by cryptographic password hashing during authentication and large payload serializations during batch rebalances.
 
-### 3.4 Production Feasibility and MVP Conclusion
+### 3.4 Benchmark on PostgreSQL 16
+
+The same harness was run against PostgreSQL 16. With 2,000 orders in the database, 23 of 25 endpoints have a p95 under 30 ms and 24 of 25 under 50 ms; the slowest is `POST batch rebalance` (p95 about 82 ms, median 22 ms). No endpoint issues N+1 queries: reads use at most 3 SQL queries at every data size. All 325 tests also pass on PostgreSQL, and CI runs them there.
+
+### 3.5 Production Feasibility and MVP Conclusion
 
 The test results show that Quorda works well as an MVP for small to medium kitchens:
 - **Reliable Under Load:** The system handled concurrent traffic without dropping or failing any requests.
 - **Good Fit for Small and Medium Kitchens:** The performance is well suited for kitchens handling 500 to 2,000 active orders per service without database slowdowns.
-- **Testing Improvements:** The current tests give a solid early evaluation, but the testing techniques and tools can be improved in future stages (such as testing on dedicated production servers instead of local runs and testing with PostgreSQL directly) to get more accurate and realistic results.
+- **Testing Improvements:** The current tests give a solid early evaluation, but the testing techniques and tools can be improved in future stages (such as testing on dedicated production servers instead of local runs) to get more accurate and realistic results.
 - **Next Scaling Steps:** As the system grows, adding background task workers (such as Celery and Redis) to handle batch rebalancing and using database connection pooling will help support bigger kitchen workloads smoothly.
 
 ---
@@ -452,11 +457,18 @@ pip install -r requirements.local.txt
 Configure your `.env` file in the project root:
 
 ```env
+SECRET_KEY=your-long-random-secret-key
 DEBUG=True
-SECRET_KEY=your-secure-secret-key-here
-DATABASE_URL=postgres://quorda_user:password@localhost:5432/quorda_db
 ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+DB_NAME=<DB>
+DB_USER=<USER>
+DB_PASSWORD=<PASSWORD>
+DB_HOST=localhost
+DB_PORT=5432
 ```
+
+`.env.example` lists every variable. `SECRET_KEY` is required (the app refuses to start without it), `DEBUG` defaults to `False` when unset, and with `DEBUG=False` browser origins must be listed in `CORS_ALLOWED_ORIGINS`. To run everything in containers instead: `cp .env.example .env && docker compose up --build`.
 
 ### 3. Run Database Migrations
 
@@ -480,7 +492,8 @@ The interactive API documentation is available at:
 
 Execute the unit test suite:
 ```bash
-py manage.py test
+python manage.py test apps --settings=config.settings.test   # SQLite, no setup needed
+python manage.py test apps                                    # PostgreSQL (needs .env)
 ```
 
 Execute the in-process performance benchmark:

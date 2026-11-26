@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  checks-and-sqlite-tests:
+    name: Checks + tests (SQLite) + N+1 gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.local.txt
+
+      - name: Django system check
+        run: python manage.py check --settings=config.settings.test
+
+      - name: Fail if model changes are missing a migration
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings.test
+
+      - name: Unit and API tests
+        run: python manage.py test --settings=config.settings.test
+
+      - name: Query-count regression gate (fails on N+1)
+        run: python perf/benchmark_api.py --sizes 100,500,1000 --repeats 5 --fail-on-n-plus-one
+
+
+  tests-postgres:
+    name: Tests (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: quorda_db
+          POSTGRES_USER: quorda_user
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quorda_user -d quorda_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-0123456789abcdef
+      DEBUG: "True"
+      ALLOWED_HOSTS: localhost
+      DB_NAME: quorda_db
+      DB_USER: quorda_user
+      DB_PASSWORD: password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.local.txt
+
+      - name: Tests against real PostgreSQL (row-level locking, partial indexes)
+        run: python manage.py test --settings=config.settings.local
+
+      - name: Production settings deploy check
+        env:
+          DEBUG: "False"
+          ALLOWED_HOSTS: http://localhost:3000
+        run: |
+          export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          python manage.py check --deploy --settings=config.settings.production

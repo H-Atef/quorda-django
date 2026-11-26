@@ -24,14 +24,39 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+def env_bool(name, default=False):
+    """Parse a boolean environment variable.
+
+    os.getenv() always returns a string, and any non-empty string (including
+    "False" or "0") is truthy in Python, so it must be parsed explicitly.
+    """
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def env_list(name, default=''):
+    """Parse a comma-separated environment variable into a clean list."""
+    return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG")
+# Defaults to False so a missing variable can never enable debug mode.
+DEBUG = env_bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
 
+
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'The SECRET_KEY environment variable is not set. Copy .env.example to .env '
+        'and set a long random value.'
+    )
 
 # Application definition
 DJANGO_APPS = [
@@ -73,7 +98,10 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS: open only in DEBUG; otherwise restrict to the origins listed in
+# CORS_ALLOWED_ORIGINS (comma-separated, e.g. https://app.example.com).
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
 
 TEMPLATES = [
     {
@@ -165,7 +193,6 @@ AUTH_USER_MODEL = "users.User"
 REST_FRAMEWORK = {
       'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
