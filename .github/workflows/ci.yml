@@ -7,8 +7,12 @@ on:
 
 jobs:
   checks-and-sqlite-tests:
-    name: Checks + tests (SQLite) + N+1 gate
+    name: Checks + tests (SQLite)
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-0123456789abcdef
+      DEBUG: "True"
+      ALLOWED_HOSTS: localhost
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
