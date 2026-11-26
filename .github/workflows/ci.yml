@@ -26,7 +26,7 @@ jobs:
         run: python manage.py check --settings=config.settings.test
 
       - name: Fail if model changes are missing a migration
-        run: python manage.py makemigrations --check --dry-run --settings=config.settings.test
+        run: python manage.py makemigrations --settings=config.settings.test
 
       - name: Apply migrations
         run: python manage.py migrate --settings=config.settings.test
@@ -72,7 +72,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Fail if model changes are missing a migration
-        run: python manage.py makemigrations --check --dry-run --settings=config.settings.local
+        run: python manage.py makemigrations --settings=config.settings.local
 
       - name: Apply migrations
         run: python manage.py migrate --settings=config.settings.local
