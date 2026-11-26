@@ -139,54 +139,34 @@ Every order entering the Quorda system receives an automated `priority_score` be
 
 1. **Total Preparation Time ($`T`$):** the aggregated preparation duration of all line items.
 
-   ```math
-   T = \sum_{i=1}^{n} \text{prep time}_i \times \text{quantity}_i
-   ```
+   $`T = \sum_{i=1}^{n} \text{prep time}_i \times \text{quantity}_i`$
 
    The inverse preparation score rewards quick-to-prepare orders:
 
-   ```math
-   \text{time score} = \min\left(\frac{2.0}{T + 1},\ 1.0\right)
-   ```
+   $`\text{time score} = \min\left(\frac{2.0}{T + 1},\ 1.0\right)`$
 
 2. **Total Quantity ($`Q`$):** the total item count on the ticket.
 
-   ```math
-   Q = \sum_{i=1}^{n} \text{quantity}_i
-   ```
+   $`Q = \sum_{i=1}^{n} \text{quantity}_i`$
 
    The inverse quantity score rewards lightweight tickets:
 
-   ```math
-   \text{quantity score} = \min\left(\frac{2.0}{Q + 1},\ 1.0\right)
-   ```
+   $`\text{quantity score} = \min\left(\frac{2.0}{Q + 1},\ 1.0\right)`$
 
 3. **Maximum Category Priority ($`C_{\max}`$):** menu items belong to categories with an integer priority from 1 (lowest) to 5 (highest).
 
-   ```math
-   C_{\max} = \max_{i=1}^{n} \text{category priority}_i
-   ```
+   $`C_{\max} = \max_{i=1}^{n} \text{category priority}_i`$
 
    It is normalized to the range 0 to 1:
 
-   ```math
-   \text{category score} =
-   \begin{cases}
-   \dfrac{C_{\max} - 1}{4}, & \text{if at least one item has a category} \\[6pt]
-   0.0, & \text{otherwise}
-   \end{cases}
-   ```
+   $`\text{category score} = \begin{cases} \dfrac{C_{\max} - 1}{4}, & \text{if at least one item has a category} \\[6pt] 0.0, & \text{otherwise} \end{cases}`$
 
 The final `priority_score` is a weighted linear combination of the three normalized terms:
 
-```math
-\text{priority score} =
-w_{\text{time}} \cdot \text{time score} +
-w_{\text{quantity}} \cdot \text{quantity score} +
-w_{\text{category}} \cdot \text{category score}
-```
+$`\text{priority score} = w_{\text{time}} \cdot \text{time score} + w_{\text{quantity}} \cdot \text{quantity score} + w_{\text{category}} \cdot \text{category score}`$
 
 - **Default weights:** $`w_{\text{time}} = 0.4`$, $`w_{\text{quantity}} = 0.4`$, $`w_{\text{category}} = 0.2`$, so that $`w_{\text{time}} + w_{\text{quantity}} + w_{\text{category}} = 1.0`$.
+
 - **Customizability:** weights can be reconfigured per restaurant through the `/api/v1/restaurants/calculation-params/` endpoint to match different kitchen strategies (for example, favoring preparation speed over category tiering).
 
 #### 2.2.2 Arrival Aging and Batch Windowing (The 4th Factor)
